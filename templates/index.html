@@ -18,7 +18,7 @@
         .search-bar {
             margin: 20px 0;
         }
-        input[type="text"] {
+        input[type="search"] {
             width: 300px;
             padding: 10px;
             border: 2px solid #555; /* Default border color */
@@ -92,25 +92,63 @@
 <body>
     <h1>{{ title }}</h1>
     <div class="search-bar">
-        <form method="POST">
+        <form id="searchForm" method="POST">
             <select id="searchOption" name="option" onchange="changeBorderColor()">
                 <!-- TODO: Here we can specify the IIR method options -->
-                <option value="Name" {% if selected_option == 'Name' %}selected{% endif %}>Name</option>
-                <option value="Age" {% if selected_option == 'Age' %}selected{% endif %}>Age</option>
-                <option value="Misc" {% if selected_option == 'Misc' %}selected{% endif %}>Misc</option>
+                <option value="Baseline" {% if selected_option == 'Baseline' %}selected{% endif %}>Baseline</option>
+                <option value="TF-IDF" {% if selected_option == 'TF-IDF' %}selected{% endif %}>TF-IDF</option>
             </select>
+            <!-- Input (query) to the IR system is the title and artist of a song (track) -->
             <input
-                id="searchInput"
-                type="text"
-                name="search"
-                placeholder="Enter your search"
+                id="artist"
+                type="search"
+                name="artist"
+                placeholder="Enter artist"
                 required
+                list="artistOptions"
+                onchange="filterTitles()"
                 style="border-color: {{ border_color }};">
+            <datalist id="artistOptions">
+                {% for artist in songs_by_artist.keys() %}
+                <option value="{{ artist }}"></option>
+                {% endfor %}
+            </datalist>
+            <input
+                id="songTitle"
+                type="search"
+                name="songTitle"
+                placeholder="Enter title"
+                required
+                list="songTitleOptions"
+                style="border-color: {{ border_color }};">
+            <datalist id="songTitleOptions">
+                {% for songTitle in songs_by_artist.values() %}
+                <option value="{{ songTitle }}"></option>
+                {% endfor %}
+            </datalist>
             <button type="submit">Search</button>
+            <button type="button" id="clearButton" onclick="clearForm()">Clear</button>
         </form>
     </div>
     <div class="search-results">
-        <h3>Search Results for: {{ search_query or '' }}</h3>
+        <h3 id="seachResultsHeading">Search Results {{ 'for ' + artist + ' - ' + songTitle or '' }}</h3>
+
+        <!-- Metrics Display -->
+        <div id="metrics" style="display: flex; justify-content: center; gap: 20px; margin-top: 10px; font-size: 16px;">
+            <div>
+                <strong>Precision:</strong> {{ precision }}
+            </div>
+            <div>
+                <strong>Recall:</strong> {{ recall }}
+            </div>
+            <div>
+                <strong>NDCG:</strong> {{ ndcg }}
+            </div>
+            <div>
+                <strong>MRR:</strong> {{ mrr }}
+            </div>
+        </div>
+        <p>{{ message or '' }}</p>
 
         <!-- TODO: adjust the table columns. What should the output contain? -->
         <table id="resultsTable" data-sort-asc="true" data-sort-column="0">
@@ -126,9 +164,9 @@
                 {% for result in search_results %}
                 <tr>
                     <td>{{ loop.index }}</td>
-                    <td>{{ result.author }}</td>
-                    <td>{{ result.title }}</td>
-                    <td><a href= {{ result.link }} target="_blank">Example Link</a></td>
+                    <td>{{ result.artist }}</td>
+                    <td>{{ result.song }}</td>
+                    <td><a href= {{ result.url }} target="_blank">Example Link</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -136,13 +174,23 @@
         <!-- TODO: adjust the scripts especially changeBorderColor to the IIR methods -->
         <script>
             function changeBorderColor() {
-                const searchInput = document.getElementById("searchInput");
+                const artist = document.getElementById("artist");
+                const songTitle = document.getElementById("songTitle");
                 const searchOption = document.getElementById("searchOption").value;
 
                 switch(searchOption) {
-                    case "Name": searchInput.style.borderColor = "red"; break;
-                    case "Age": searchInput.style.borderColor = "blue"; break;
-                    case "Misc": searchInput.style.borderColor = "green"; break;
+                    case "Baseline":
+                        artist.style.borderColor = "red";
+                        songTitle.style.borderColor = "red";
+                        break;
+                    case "TF-IDF":
+                        artist.style.borderColor = "green";
+                        songTitle.style.borderColor = "green";
+                        break;
+                    default:
+                        artist.style.borderColor = "black";
+                        songTitle.style.borderColor = "black";
+                        break;
                 }
             }
 
@@ -182,8 +230,61 @@
                 table.setAttribute("data-sort-column", columnIndex);
             }
 
-            // Persist border color of search bar on page load
-            window.onload = changeBorderColor;
+            // A dictionary of songs grouped by artist
+            const songsByArtist = {{ songs_by_artist | tojson }};
+
+            function filterTitles() {
+                const artistInput = document.getElementById("artist").value;
+                const songTitleOptions = document.getElementById("songTitleOptions");
+
+                // Clear existing options
+                songTitleOptions.innerHTML = "";
+
+                // If the artist exists in the dictionary, populate the titleOptions datalist
+                if (songsByArtist[artistInput]) {
+                    songsByArtist[artistInput].forEach(title => {
+                        const option = document.createElement("option");
+                        option.value = title;
+                        songTitleOptions.appendChild(option);
+                    });
+                }
+            }
+
+            function clearForm() {
+                const searchForm = document.getElementById("searchForm");
+                const songTitleOptions = document.getElementById("songTitleOptions");
+                const resultsTable = document.getElementById("resultsTable");
+                const searchResultsHeading = document.getElementById("seachResultsHeading");
+                const metrics = document.getElementById("metrics");
+
+                // Reset all form fields
+                searchForm.reset();
+
+                // Clear dynamically populated song title options
+                if (songTitleOptions) {
+                    songTitleOptions.innerHTML = "";
+                }
+
+                // Hide the search results (optional)
+                if (resultsTable) {
+                    resultsTable.style.display = "none";
+                }
+
+                // Reset the search results heading
+                searchResultsHeading.textContent = "Search Results";
+
+                // Reset the metrics display
+                if (metrics) {
+                    metrics.style.display = "none";
+                }
+
+                // Reset border colors to default
+                changeBorderColor();
+            }
+
+            window.onload = () => {
+                changeBorderColor();
+            };
         </script>
     </div>
 </body>
