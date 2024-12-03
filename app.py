@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request
 import random
-import pandas as pd
 
 app = Flask(__name__)
 search_query = ""  # The query from the search bar is stored here in a simple string
