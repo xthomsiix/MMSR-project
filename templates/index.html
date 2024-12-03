@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: Arial;
+            background-color: #121212;
+            color: #e0e0e0;
+            text-align: center;
+            margin: 50px;
+        }
+        h1 {
+            color: #ff6f61;
+        }
+        .search-bar {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            width: 300px;
+            padding: 10px;
+            border: 2px solid #555; /* Default border color */
+            border-radius: 5px;
+            background-color: #222;
+            color: #e0e0e0;
+        }
+        select {
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #444;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        select:focus {
+            outline: none;
+            border-color: #888;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #ff6f61;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #ff8a75;
+        }
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #444;
+            color: #e0e0e0;
+            cursor: pointer;
+            position: relative;
+        }
+        th.sorted-asc::after {
+            content: " ▲";
+            position: absolute;
+            right: 10px;
+        }
+        th.sorted-desc::after {
+            content: " ▼";
+            position: absolute;
+            right: 10px;
+        }
+        td {
+            background-color: #222;
+        }
+        a {
+            color: #ff6f61;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <div class="search-bar">
+        <form method="POST">
+            <select id="searchOption" name="option" onchange="changeBorderColor()">
+                <!-- TODO: Here we can specify the IIR method options -->
+                <option value="Name" {% if selected_option == 'Name' %}selected{% endif %}>Name</option>
+                <option value="Age" {% if selected_option == 'Age' %}selected{% endif %}>Age</option>
+                <option value="Misc" {% if selected_option == 'Misc' %}selected{% endif %}>Misc</option>
+            </select>
+            <input
+                id="searchInput"
+                type="text"
+                name="search"
+                placeholder="Enter your search"
+                required
+                style="border-color: {{ border_color }};">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+    <div class="search-results">
+        <h3>Search Results for: {{ search_query or '' }}</h3>
+
+        <!-- TODO: adjust the table columns. What should the output contain? -->
+        <table id="resultsTable" data-sort-asc="true" data-sort-column="0">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0, true)">Rank</th>
+                    <th onclick="sortTable(1, false)">Author</th>
+                    <th onclick="sortTable(2, false)">Title</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in search_results %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ result.author }}</td>
+                    <td>{{ result.title }}</td>
+                    <td><a href= {{ result.link }} target="_blank">Example Link</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <!-- TODO: adjust the scripts especially changeBorderColor to the IIR methods -->
+        <script>
+            function changeBorderColor() {
+                const searchInput = document.getElementById("searchInput");
+                const searchOption = document.getElementById("searchOption").value;
+
+                switch(searchOption) {
+                    case "Name": searchInput.style.borderColor = "red"; break;
+                    case "Age": searchInput.style.borderColor = "blue"; break;
+                    case "Misc": searchInput.style.borderColor = "green"; break;
+                }
+            }
+
+            function sortTable(columnIndex, isNumeric) {
+                const table = document.getElementById("resultsTable");
+                const rows = Array.from(table.rows).slice(1); // Exclude header row
+                const isAscending = table.getAttribute("data-sort-asc") === "true";
+                const currentSortColumn = parseInt(table.getAttribute("data-sort-column"));
+
+                // Reset column sorting
+                Array.from(table.rows[0].cells).forEach((cell, index) => {
+                    cell.classList.remove("sorted-asc", "sorted-desc");
+                    if (index === columnIndex) {
+                        cell.classList.add(isAscending ? "sorted-asc" : "sorted-desc");
+                    }
+                });
+
+                // Sort rows
+                rows.sort((rowA, rowB) => {
+                    let valA = rowA.cells[columnIndex].innerText;
+                    let valB = rowB.cells[columnIndex].innerText;
+
+                    if (isNumeric) {
+                        valA = parseInt(valA, 10);
+                        valB = parseInt(valB, 10);
+                        return isAscending ? valA - valB : valB - valA;
+                    } else {
+                        return isAscending ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    }
+                });
+
+                // Re-append sorted rows
+                rows.forEach(row => table.tBodies[0].appendChild(row));
+
+                // Update sort icons and attributes
+                table.setAttribute("data-sort-asc", columnIndex === currentSortColumn ? !isAscending : true);
+                table.setAttribute("data-sort-column", columnIndex);
+            }
+
+            // Persist border color of search bar on page load
+            window.onload = changeBorderColor;
+        </script>
+    </div>
+</body>
+</html>
