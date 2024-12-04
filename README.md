@@ -8,3 +8,4 @@
 
 - execute `poetry config virtualenvs.in-project true` to set the config to create the `.venv` folder in the project directory. This helps to better manage virtual environments
 - run `poetry install --no-root` in the root directory (where the `pyproject.toml` file is located) to install all dependencies.
+- afterwards you should have a `.venv` file in your root directory. (IDEs typically detect new environments automatically)
