@@ -131,7 +131,12 @@
         </form>
     </div>
     <div class="search-results">
-        <h3 id="seachResultsHeading">Search Results {{ 'for ' + artist + ' - ' + songTitle or '' }}</h3>
+        <h3 id="seachResultsHeading">
+            Search Results: 
+            {% if artist and songTitle %}
+                {{ artist }} - {{ songTitle }}
+            {% endif %}
+        </h3>
 
         <!-- Metrics Display -->
         <div id="metrics" style="display: flex; justify-content: center; gap: 20px; margin-top: 10px; font-size: 16px;">
@@ -166,7 +171,7 @@
                     <td>{{ loop.index }}</td>
                     <td>{{ result.artist }}</td>
                     <td>{{ result.song }}</td>
-                    <td><a href= {{ result.url }} target="_blank">Example Link</a></td>
+                    <td><a href= {{ result.url }} target="_blank">Link</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
