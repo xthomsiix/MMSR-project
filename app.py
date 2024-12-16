@@ -3,6 +3,7 @@ import logging
 from typing import Dict, List
 from flask import Flask, render_template, request
 
+from services.metrics import MetricCalculator
 from services.mmrs import MultiMediaRetrievalSystem
 from services.data import DatasetLoader
 
@@ -36,6 +37,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 # initialize Flask app
 app = Flask(__name__)
+
+# TODO: How to test MetricCalculator (switch logging level to WARNING when testing)
+# metric_calculator = MetricCalculator()
+# print(metric_calculator.compute_avg_pop_at_n(IRMethod.TFIDF.value, 10, dataset_loader.tfidf))
 
 
 # Functionality of the home page

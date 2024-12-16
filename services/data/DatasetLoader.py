@@ -47,6 +47,8 @@ class DatasetLoader:
         self.id_artist_song_album: pd.DataFrame = self._load("id_information_mmsr.tsv")
         self.id_url: pd.DataFrame = self._load("id_url_mmsr.tsv")
         self.id_genres: pd.DataFrame = self._load("id_genres_mmsr.tsv", {"genre": eval})
+        self.id_tags: pd.DataFrame = self._load("id_tags_dict.tsv", {"(tag, weight)": eval})
+        self.id_metadata: pd.DataFrame = self._load("id_metadata_mmsr.tsv", {"popularity": eval})
         self.tfidf: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
             self._load("id_lyrics_tf-idf_mmsr.tsv")
         )
