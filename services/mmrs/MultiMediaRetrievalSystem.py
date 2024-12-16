@@ -38,7 +38,7 @@ class MultiMediaRetrievalSystem:
         id_information_mmsr: pd.DataFrame,
         id_genres: pd.DataFrame,
         id_urls: pd.DataFrame,
-    ) -> None:
+    ):
         """Prepare the data for the search process.
 
         Args:
@@ -112,7 +112,7 @@ class MultiMediaRetrievalSystem:
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
         # return only the relevant columns: artist, song, and url
-        search_results = query_result[["artist", "song", "url"]].to_dict(  # type: ignore
+        search_results = query_result[["id", "artist", "song", "url"]].to_dict(  # type: ignore
             orient="records"
         )
         return {
@@ -166,7 +166,7 @@ class MultiMediaRetrievalSystem:
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
         # return only the relevant columns: artist, song, and url
-        search_results = query_result[["artist", "song", "url"]].to_dict(  # type: ignore
+        search_results = query_result[["id", "artist", "song", "url"]].to_dict(  # type: ignore
             orient="records"
         )
         return {
@@ -317,3 +317,4 @@ class MultiMediaRetrievalSystem:
 
         # if no relevant item is found, return zero
         return 0.0
+
