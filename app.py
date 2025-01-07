@@ -24,12 +24,21 @@ mmrs.prepare_data(
 class IRMethod(Enum):
     BASELINE = "Baseline"
     TFIDF = "TF-IDF"
+    BERT = "BERT"
+    BLF_SPECTRAL = "BLF-Spectral"
+    MUSIC_NN = "MusicNN"
+    RESNET = "ResNet"
+    VGG19 = "VGG19"
 
 
 class BorderColor(Enum):
     RED = "red"
     BLUE = "blue"
     GREEN = "green"
+    ORANGE = "orange"
+    PURPLE = "purple"
+    MAROON = "maroon"
+    BROWN = "brown"
 
 
 # initialize logger
@@ -66,6 +75,41 @@ def home():
                 border_color = BorderColor.GREEN.value
                 ir_results = mmrs.tfidf(
                     dataset_loader.tfidf,
+                    artist,
+                    song_title,
+                )
+            case IRMethod.BERT.value:
+                border_color = BorderColor.BLUE.value
+                ir_results = mmrs.bert(
+                    dataset_loader.bert,  
+                    artist,
+                    song_title,
+                    )
+            case IRMethod.BLF_SPECTRAL.value:
+                border_color = BorderColor.ORANGE.value
+                ir_results = mmrs.blf_spectral(
+                    dataset_loader.blf_spectral,  
+                    artist,
+                    song_title,
+                )
+            case IRMethod.MUSIC_NN.value:
+                border_color = BorderColor.PURPLE.value
+                ir_results = mmrs.music_nn(
+                    dataset_loader.music_nn,  
+                    artist,
+                    song_title,
+                )
+            case IRMethod.RESNET.value:
+                border_color = BorderColor.MAROON.value
+                ir_results = mmrs.resnet(
+                    dataset_loader.resnet,  
+                    artist,
+                    song_title,
+                )
+            case IRMethod.VGG19.value:
+                border_color = BorderColor.BROWN.value
+                ir_results = mmrs.vgg19(
+                    dataset_loader.vgg19, 
                     artist,
                     song_title,
                 )

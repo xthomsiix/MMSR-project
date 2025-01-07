@@ -177,6 +177,256 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
+    
+    def bert(
+        self,
+        bert: np.ndarray[Any, np.dtype[np.float64]],
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+        """
+        Performs a cosine-similarity–based search on BERT embeddings.
+        """
+        self.logger.debug(
+            f"Generating BERT-based search results for {artist} - {song_title}"
+        )
+
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        #retrieve query item bert
+        query_item_bert: np.ndarray[Any, np.dtype[np.float64]] = bert[
+                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+            ]
+
+        cosine_similarities: np.ndarray[Any, np.dtype[np.float64]] = np.dot(
+            bert, query_item_bert.T
+        )
+
+        #Get the top N items
+        modified_N = N + 1  # exclude the query item itself
+        top_N_indices: np.ndarray[Any, np.dtype[np.int64]] = np.argsort(
+            cosine_similarities
+        )[-modified_N:-1][::-1]
+
+        #Retrieve those items from self.data
+        query_result: pd.DataFrame = self.data.iloc[top_N_indices]
+
+        #Compute metrics
+        precision: float = self._compute_precision_at_k(query_result, query_item, N)
+        recall: float = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        return {
+            "search_results": search_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
+    
+    def blf_spectral(
+        self,
+        blf_spectral: np.ndarray[Any, np.dtype[np.float64]],
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+        """
+        Performs a cosine-similarity–based search on blf_spectral embeddings.
+        """
+        self.logger.debug(
+            f"Generating blf_spectral-based search results for {artist} - {song_title}"
+        )
+
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        #retrieve query item blf_spectral
+        query_item_blf_spectral: np.ndarray[Any, np.dtype[np.float64]] = bert[
+                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+            ]
+
+        cosine_similarities: np.ndarray[Any, np.dtype[np.float64]] = np.dot(
+            blf_spectral, query_item_blf_spectral.T
+        )
+
+        #Get the top N items
+        modified_N = N + 1  # exclude the query item itself
+        top_N_indices: np.ndarray[Any, np.dtype[np.int64]] = np.argsort(
+            cosine_similarities
+        )[-modified_N:-1][::-1]
+
+        #Retrieve those items from self.data
+        query_result: pd.DataFrame = self.data.iloc[top_N_indices]
+
+        #Compute metrics
+        precision: float = self._compute_precision_at_k(query_result, query_item, N)
+        recall: float = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        return {
+            "search_results": search_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
+    
+    def music_nn(
+        self,
+        music_nn: np.ndarray[Any, np.dtype[np.float64]],
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+        """
+        Performs a cosine-similarity–based search on music_nn embeddings.
+        """
+        self.logger.debug(
+            f"Generating music_nn-based search results for {artist} - {song_title}"
+        )
+
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        #retrieve query item music_nn
+        query_item_music_nn: np.ndarray[Any, np.dtype[np.float64]] = bert[
+                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+            ]
+
+        cosine_similarities: np.ndarray[Any, np.dtype[np.float64]] = np.dot(
+            music_nn, query_item_music_nn.T
+        )
+
+        #Get the top N items
+        modified_N = N + 1  # exclude the query item itself
+        top_N_indices: np.ndarray[Any, np.dtype[np.int64]] = np.argsort(
+            cosine_similarities
+        )[-modified_N:-1][::-1]
+
+        #Retrieve those items from self.data
+        query_result: pd.DataFrame = self.data.iloc[top_N_indices]
+
+        #Compute metrics
+        precision: float = self._compute_precision_at_k(query_result, query_item, N)
+        recall: float = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        return {
+            "search_results": search_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
+    
+    def resnet(
+        self,
+        resnet: np.ndarray[Any, np.dtype[np.float64]],
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+        """
+        Performs a eucledian-distance–based search on resnet embeddings.
+        """
+        self.logger.debug(
+            f"Generating resnet-based search results for {artist} - {song_title}"
+        )
+
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        #retrieve query item resnet
+        query_item_resnet: np.ndarray[Any, np.dtype[np.float64]] = resnet[
+                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+            ]
+
+        #euclidean distance
+        distances = np.linalg.norm(resnet - query_item_resnet, axis=1)
+        top_indices = np.argsort(distances)  # ascending order
+        top_indices = top_indices[top_indices != query_index]
+        top_N_indices = top_indices[:N]
+
+        query_result: pd.DataFrame = self.data.iloc[top_N_indices]
+
+        #Compute metrics
+        precision: float = self._compute_precision_at_k(query_result, query_item, N)
+        recall: float = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        return {
+            "search_results": search_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
+    
+    def vgg19(
+        self,
+        vgg19: np.ndarray[Any, np.dtype[np.float64]],
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+        """
+        Performs a eucledian-distance–based search on vgg19 embeddings.
+        """
+        self.logger.debug(
+            f"Generating vgg19-based search results for {artist} - {song_title}"
+        )
+
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        #retrieve query item vgg19
+        query_item_vgg19: np.ndarray[Any, np.dtype[np.float64]] = vgg19[
+                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+            ]
+
+        #euclidean distance
+        distances = np.linalg.norm(resnet - query_item_vgg19, axis=1)
+        top_indices = np.argsort(distances)  # ascending order
+        top_indices = top_indices[top_indices != query_index]
+        top_N_indices = top_indices[:N]
+
+        query_result: pd.DataFrame = self.data.iloc[top_N_indices]
+
+        #Compute metrics
+        precision: float = self._compute_precision_at_k(query_result, query_item, N)
+        recall: float = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        return {
+            "search_results": search_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
 
     def _compute_precision_at_k(
         self,

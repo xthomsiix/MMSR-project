@@ -97,6 +97,11 @@
                 <!-- TODO: Here we can specify the IIR method options -->
                 <option value="Baseline" {% if selected_option == 'Baseline' %}selected{% endif %}>Baseline</option>
                 <option value="TF-IDF" {% if selected_option == 'TF-IDF' %}selected{% endif %}>TF-IDF</option>
+                <option value="BERT" {% if selected_option == 'BERT' %}selected{% endif %}>BERT</option>
+                <option value="BLF-Spectral" {% if selected_option == 'BLF-Spectral' %}selected{% endif %}>BLF-Spectral</option>
+                <option value="MusicNN" {% if selected_option == 'MusicNN' %}selected{% endif %}>MusicNN</option>
+                <option value="ResNet" {% if selected_option == 'ResNet' %}selected{% endif %}>ResNet</option>
+                <option value="VGG19" {% if selected_option == 'VGG19' %}selected{% endif %}>VGG19</option>
             </select>
             <!-- Input (query) to the IR system is the title and artist of a song (track) -->
             <input
@@ -191,6 +196,26 @@
                     case "TF-IDF":
                         artist.style.borderColor = "green";
                         songTitle.style.borderColor = "green";
+                        break;
+                    case "BERT":
+                        artist.style.borderColor = "blue";
+                        songTitle.style.borderColor = "blue";
+                        break;
+                    case "BLF-Spectral":
+                        artist.style.borderColor = "orange";
+                        songTitle.style.borderColor = "orange";
+                        break;
+                    case "MusicNN":
+                        artist.style.borderColor = "purple";
+                        songTitle.style.borderColor = "purple";
+                        break;
+                    case "ResNet":
+                        artist.style.borderColor = "maroon";
+                        songTitle.style.borderColor = "maroon";
+                        break;
+                    case "VGG19":
+                        artist.style.borderColor = "brown";
+                        songTitle.style.borderColor = "brown";
                         break;
                     default:
                         artist.style.borderColor = "black";

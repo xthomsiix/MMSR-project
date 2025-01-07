@@ -52,6 +52,21 @@ class DatasetLoader:
         self.tfidf: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
             self._load("id_lyrics_tf-idf_mmsr.tsv")
         )
+        self.bert: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
+            self._load("id_lyrics_bert_mmsr.tsv")
+        )
+        self.blf_spectral: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
+            self._load("id_blf_spectral_mmsr.tsv")
+        )
+        self.music_nn: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
+            self._load("id_musicnn_mmsr.tsv")
+        )
+        self.resnet: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
+            self._load("id_resnet_mmsr.tsv")
+        )
+        self.vgg19: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
+            self._load("id_vgg19_mmsr.tsv")
+        )
 
     def _load(
         self, filename: FILENAMES, converters: Dict[str, Callable[[Any], Any]] = {}
