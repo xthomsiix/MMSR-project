@@ -1,6 +1,6 @@
 from enum import Enum
 import logging
-from typing import Dict, List
+from typing import Any, Dict, Hashable, List
 from flask import Flask, render_template, request
 
 from services.metrics import MetricCalculator
@@ -9,14 +9,18 @@ from services.data import DatasetLoader
 
 # Configure the main logger for the application
 logging.basicConfig(
-    level=logging.DEBUG,  # Set to DEBUG or another level as needed
+    level=logging.WARNING,  # Set to DEBUG or another level as needed
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
 dataset_loader: DatasetLoader = DatasetLoader()
 mmrs: MultiMediaRetrievalSystem = MultiMediaRetrievalSystem()
 mmrs.prepare_data(
-    dataset_loader.id_artist_song_album, dataset_loader.id_url, dataset_loader.id_genres
+    dataset_loader.id_artist_song_album,
+    dataset_loader.id_url,
+    dataset_loader.id_genres,
+    dataset_loader.id_metadata,
+    dataset_loader.id_tags,
 )
 
 
@@ -48,8 +52,12 @@ logger: logging.Logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # TODO: How to test MetricCalculator (switch logging level to WARNING when testing)
-# metric_calculator = MetricCalculator()
-# print(metric_calculator.compute_avg_pop_at_n(IRMethod.TFIDF.value, 10, dataset_loader.tfidf))
+metric_calculator = MetricCalculator(dataset_loader, mmrs)
+for method in IRMethod:
+    print(method.value)
+    print("Popularity", metric_calculator.compute_avg_pop_at_n(method.value, 10))
+    print("Coverage", metric_calculator.compute_cov_at_n(method.value, 10))
+    print("Diversity", metric_calculator.compute_div_at_n(method.value, 10))
 
 
 # Functionality of the home page
@@ -60,7 +68,7 @@ def home():
     song_title: str | None = request.form.get("songTitle")
     selected_iir = request.form.get("option", IRMethod.BASELINE.value)
     border_color: str | None = BorderColor.RED.value
-    ir_results: Dict[str, str | float | List[Dict[str, str]] | None] = {}
+    ir_results: Dict[str, str | float | List[Dict[Hashable, Any]] | None] = {}
 
     if request.method == "POST" and artist and song_title:
         # make a switch case for the different IIR methods
@@ -81,35 +89,35 @@ def home():
             case IRMethod.BERT.value:
                 border_color = BorderColor.BLUE.value
                 ir_results = mmrs.bert(
-                    dataset_loader.bert,  
+                    dataset_loader.bert,
                     artist,
                     song_title,
-                    )
+                )
             case IRMethod.BLF_SPECTRAL.value:
                 border_color = BorderColor.ORANGE.value
                 ir_results = mmrs.blf_spectral(
-                    dataset_loader.blf_spectral,  
+                    dataset_loader.blf_spectral,
                     artist,
                     song_title,
                 )
             case IRMethod.MUSIC_NN.value:
                 border_color = BorderColor.PURPLE.value
                 ir_results = mmrs.music_nn(
-                    dataset_loader.music_nn,  
+                    dataset_loader.music_nn,
                     artist,
                     song_title,
                 )
             case IRMethod.RESNET.value:
                 border_color = BorderColor.MAROON.value
                 ir_results = mmrs.resnet(
-                    dataset_loader.resnet,  
+                    dataset_loader.resnet,
                     artist,
                     song_title,
                 )
             case IRMethod.VGG19.value:
                 border_color = BorderColor.BROWN.value
                 ir_results = mmrs.vgg19(
-                    dataset_loader.vgg19, 
+                    dataset_loader.vgg19,
                     artist,
                     song_title,
                 )

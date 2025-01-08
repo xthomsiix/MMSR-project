@@ -1,7 +1,7 @@
 """"""
 
 import logging
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, Hashable, List, Set
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ class MultiMediaRetrievalSystem:
     logger: logging.Logger = logging.getLogger(__name__)
 
     DISPLAY_TOL: int = 4
-    FALLBACK_RESULTS: Dict[str, str | float | List[Dict[str, str]] | None] = {
+    FALLBACK_RESULTS: Dict[str, str | float | List[Dict[Hashable, Any]] | None] = {
         "search_results": [],
         "precision": None,
         "recall": None,
@@ -19,6 +19,15 @@ class MultiMediaRetrievalSystem:
         "mrr": None,
         "message": "Query item not found",
     }
+    RELEVANT_COLUMNS: List[str] = [
+        "id",
+        "artist",
+        "song",
+        "url",
+        "popularity",
+        "genre",
+        "(tag, weight)",
+    ]
 
     def __init__(self):
         pass
@@ -35,9 +44,7 @@ class MultiMediaRetrievalSystem:
 
     def prepare_data(
         self,
-        id_information_mmsr: pd.DataFrame,
-        id_genres: pd.DataFrame,
-        id_urls: pd.DataFrame,
+        *datasets: pd.DataFrame,
     ):
         """Prepare the data for the search process.
 
@@ -46,11 +53,14 @@ class MultiMediaRetrievalSystem:
             id_genres (pd.DataFrame): The genre data.
             id_urls (pd.DataFrame): The URL data.
         """
-        # merge with the genre data
-        data = id_information_mmsr.merge(id_genres, on="id")
-        # merge with the URL data
-        self.data: pd.DataFrame = data.merge(id_urls, on="id")
+        data = None
+        for dataset in datasets:
+            if data is None:
+                data = dataset
+            else:
+                data = data.merge(dataset, on="id")
         self.logger.debug("Prepared data for IR process")
+        self.data: pd.DataFrame = data  # type: ignore
 
     def retrieve_query_item(
         self,
@@ -76,12 +86,25 @@ class MultiMediaRetrievalSystem:
             return None
         return query_item
 
+    def get_formatted_search_results(
+        self, query_results: pd.DataFrame
+    ) -> List[Dict[Hashable, Any]]:
+        """Format the search results for display.
+
+        Args:
+            query_results (pd.DataFrame): The search results.
+
+        Returns:
+            List[Dict[str, str]]: The formatted search results.
+        """
+        return query_results[self.RELEVANT_COLUMNS].to_dict(orient="records")
+
     def baseline(
         self,
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """Create a simple baseline system that randomly (regardless of the query) selects N items
         from the catalog (excluding the query item); Make sure that the system produces new
         results for each query!
@@ -112,9 +135,7 @@ class MultiMediaRetrievalSystem:
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
         # return only the relevant columns: artist, song, and url
-        search_results = query_result[["id", "artist", "song", "url"]].to_dict(  # type: ignore
-            orient="records"
-        )
+        search_results = self.get_formatted_search_results(query_result)
         return {
             "search_results": search_results,  # type: ignore
             "precision": precision,
@@ -130,7 +151,7 @@ class MultiMediaRetrievalSystem:
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """"""
         self.logger.debug(
             f"Generating tfidf search results based on lyrics for {artist} - {song_title}"
@@ -166,9 +187,7 @@ class MultiMediaRetrievalSystem:
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
         # return only the relevant columns: artist, song, and url
-        search_results = query_result[["id", "artist", "song", "url"]].to_dict(  # type: ignore
-            orient="records"
-        )
+        search_results = self.get_formatted_search_results(query_result)
         return {
             "search_results": search_results,  # type: ignore
             "precision": precision,
@@ -177,16 +196,16 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
-    
+
     def bert(
         self,
         bert: np.ndarray[Any, np.dtype[np.float64]],
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """
-        Performs a cosine-similarity–based search on BERT embeddings.
+        Performs a cosine-similarity-based search on BERT embeddings.
         """
         self.logger.debug(
             f"Generating BERT-based search results for {artist} - {song_title}"
@@ -196,47 +215,47 @@ class MultiMediaRetrievalSystem:
         if query_item is None:
             return self.FALLBACK_RESULTS
 
-        #retrieve query item bert
+        # retrieve query item bert
         query_item_bert: np.ndarray[Any, np.dtype[np.float64]] = bert[
-                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
-            ]
+            self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+        ]
 
         cosine_similarities: np.ndarray[Any, np.dtype[np.float64]] = np.dot(
             bert, query_item_bert.T
-        )
+        ).flatten()
 
-        #Get the top N items
+        # Get the top N items
         modified_N = N + 1  # exclude the query item itself
         top_N_indices: np.ndarray[Any, np.dtype[np.int64]] = np.argsort(
             cosine_similarities
         )[-modified_N:-1][::-1]
 
-        #Retrieve those items from self.data
+        # Retrieve those items from self.data
         query_result: pd.DataFrame = self.data.iloc[top_N_indices]
 
-        #Compute metrics
+        # Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
         recall: float = self._compute_recall_at_k(query_result, query_item, N)
         ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
-        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        search_results = self.get_formatted_search_results(query_result)
         return {
-            "search_results": search_results,
+            "search_results": search_results,  # type: ignore
             "precision": precision,
             "recall": recall,
             "ndcg": ndcg,
             "mrr": mmr,
             "message": None,
         }
-    
+
     def blf_spectral(
         self,
         blf_spectral: np.ndarray[Any, np.dtype[np.float64]],
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """
         Performs a cosine-similarity–based search on blf_spectral embeddings.
         """
@@ -248,47 +267,47 @@ class MultiMediaRetrievalSystem:
         if query_item is None:
             return self.FALLBACK_RESULTS
 
-        #retrieve query item blf_spectral
-        query_item_blf_spectral: np.ndarray[Any, np.dtype[np.float64]] = bert[
-                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
-            ]
+        # retrieve query item blf_spectral
+        query_item_blf_spectral: np.ndarray[Any, np.dtype[np.float64]] = blf_spectral[
+            self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+        ]
 
         cosine_similarities: np.ndarray[Any, np.dtype[np.float64]] = np.dot(
             blf_spectral, query_item_blf_spectral.T
-        )
+        ).flatten()
 
-        #Get the top N items
+        # Get the top N items
         modified_N = N + 1  # exclude the query item itself
         top_N_indices: np.ndarray[Any, np.dtype[np.int64]] = np.argsort(
             cosine_similarities
         )[-modified_N:-1][::-1]
 
-        #Retrieve those items from self.data
+        # Retrieve those items from self.data
         query_result: pd.DataFrame = self.data.iloc[top_N_indices]
 
-        #Compute metrics
+        # Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
         recall: float = self._compute_recall_at_k(query_result, query_item, N)
         ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
-        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        search_results = self.get_formatted_search_results(query_result)
         return {
-            "search_results": search_results,
+            "search_results": search_results,  # type: ignore
             "precision": precision,
             "recall": recall,
             "ndcg": ndcg,
             "mrr": mmr,
             "message": None,
         }
-    
+
     def music_nn(
         self,
         music_nn: np.ndarray[Any, np.dtype[np.float64]],
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """
         Performs a cosine-similarity–based search on music_nn embeddings.
         """
@@ -300,31 +319,31 @@ class MultiMediaRetrievalSystem:
         if query_item is None:
             return self.FALLBACK_RESULTS
 
-        #retrieve query item music_nn
-        query_item_music_nn: np.ndarray[Any, np.dtype[np.float64]] = bert[
-                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
-            ]
+        # retrieve query item music_nn
+        query_item_music_nn: np.ndarray[Any, np.dtype[np.float64]] = music_nn[
+            self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+        ]
 
         cosine_similarities: np.ndarray[Any, np.dtype[np.float64]] = np.dot(
             music_nn, query_item_music_nn.T
-        )
+        ).flatten()
 
-        #Get the top N items
+        # Get the top N items
         modified_N = N + 1  # exclude the query item itself
         top_N_indices: np.ndarray[Any, np.dtype[np.int64]] = np.argsort(
             cosine_similarities
         )[-modified_N:-1][::-1]
 
-        #Retrieve those items from self.data
+        # Retrieve those items from self.data
         query_result: pd.DataFrame = self.data.iloc[top_N_indices]
 
-        #Compute metrics
+        # Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
         recall: float = self._compute_recall_at_k(query_result, query_item, N)
         ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
-        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        search_results = self.get_formatted_search_results(query_result)
         return {
             "search_results": search_results,
             "precision": precision,
@@ -333,14 +352,14 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
-    
+
     def resnet(
         self,
         resnet: np.ndarray[Any, np.dtype[np.float64]],
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """
         Performs a eucledian-distance–based search on resnet embeddings.
         """
@@ -352,26 +371,25 @@ class MultiMediaRetrievalSystem:
         if query_item is None:
             return self.FALLBACK_RESULTS
 
-        #retrieve query item resnet
+        # retrieve query item resnet
         query_item_resnet: np.ndarray[Any, np.dtype[np.float64]] = resnet[
-                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
-            ]
+            self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+        ]
 
-        #euclidean distance
+        # euclidean distance
         distances = np.linalg.norm(resnet - query_item_resnet, axis=1)
         top_indices = np.argsort(distances)  # ascending order
-        top_indices = top_indices[top_indices != query_index]
-        top_N_indices = top_indices[:N]
+        top_N_indices = top_indices[1 : N + 1]  # noqa: E203
 
         query_result: pd.DataFrame = self.data.iloc[top_N_indices]
 
-        #Compute metrics
+        # Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
         recall: float = self._compute_recall_at_k(query_result, query_item, N)
         ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
-        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        search_results = self.get_formatted_search_results(query_result)
         return {
             "search_results": search_results,
             "precision": precision,
@@ -380,14 +398,14 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
-    
+
     def vgg19(
         self,
         vgg19: np.ndarray[Any, np.dtype[np.float64]],
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """
         Performs a eucledian-distance–based search on vgg19 embeddings.
         """
@@ -399,26 +417,25 @@ class MultiMediaRetrievalSystem:
         if query_item is None:
             return self.FALLBACK_RESULTS
 
-        #retrieve query item vgg19
+        # retrieve query item vgg19
         query_item_vgg19: np.ndarray[Any, np.dtype[np.float64]] = vgg19[
-                self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
-            ]
+            self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+        ]
 
-        #euclidean distance
-        distances = np.linalg.norm(resnet - query_item_vgg19, axis=1)
+        # euclidean distance
+        distances = np.linalg.norm(vgg19 - query_item_vgg19, axis=1)
         top_indices = np.argsort(distances)  # ascending order
-        top_indices = top_indices[top_indices != query_index]
-        top_N_indices = top_indices[:N]
+        top_N_indices = top_indices[1 : N + 1]  # noqa: E203
 
         query_result: pd.DataFrame = self.data.iloc[top_N_indices]
 
-        #Compute metrics
+        # Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
         recall: float = self._compute_recall_at_k(query_result, query_item, N)
         ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
         mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
 
-        search_results = query_result[["id", "artist", "song", "url"]].to_dict(orient="records")
+        search_results = self.get_formatted_search_results(query_result)
         return {
             "search_results": search_results,
             "precision": precision,
@@ -567,4 +584,3 @@ class MultiMediaRetrievalSystem:
 
         # if no relevant item is found, return zero
         return 0.0
-
