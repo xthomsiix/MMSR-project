@@ -6,6 +6,7 @@ from flask import Flask, render_template, request
 from services.metrics import MetricCalculator
 from services.mmrs import MultiMediaRetrievalSystem
 from services.data import DatasetLoader
+from services.common import IRMethod
 
 # Configure the main logger for the application
 logging.basicConfig(
@@ -22,17 +23,6 @@ mmrs.prepare_data(
     dataset_loader.id_metadata,
     dataset_loader.id_tags,
 )
-
-
-# define constants for configuration and rendering
-class IRMethod(Enum):
-    BASELINE = "Baseline"
-    TFIDF = "TF-IDF"
-    BERT = "BERT"
-    BLF_SPECTRAL = "BLF-Spectral"
-    MUSIC_NN = "MusicNN"
-    RESNET = "ResNet"
-    VGG19 = "VGG19"
 
 
 class BorderColor(Enum):
@@ -52,12 +42,12 @@ logger: logging.Logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # TODO: How to test MetricCalculator (switch logging level to WARNING when testing)
-metric_calculator = MetricCalculator(dataset_loader, mmrs)
-for method in IRMethod:
-    print(method.value)
-    print("Popularity", metric_calculator.compute_avg_pop_at_n(method.value, 10))
-    print("Coverage", metric_calculator.compute_cov_at_n(method.value, 10))
-    print("Diversity", metric_calculator.compute_div_at_n(method.value, 10))
+# metric_calculator = MetricCalculator(dataset_loader, mmrs)
+# for method in IRMethod:
+#     print(method.value)
+#     print("Popularity", metric_calculator.compute_avg_pop_at_n(method, 10))
+#     print("Coverage", metric_calculator.compute_cov_at_n(method, 10))
+#     print("Diversity", metric_calculator.compute_div_at_n(method, 10))
 
 
 # Functionality of the home page

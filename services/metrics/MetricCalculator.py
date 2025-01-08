@@ -3,8 +3,8 @@ from typing import Any, Dict, Hashable, List, Set
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
+from services.common import IRMethod
 from services.mmrs import MultiMediaRetrievalSystem
 from services.data import DatasetLoader
 
@@ -12,17 +12,18 @@ from services.data import DatasetLoader
 class MetricCalculator:
     logger: logging.Logger = logging.getLogger(__name__)
     DISPLAY_TOL: int = 4
-    DEBUG_RUN_NR: int = 100
+    DEBUG_NR_SAMPLES: int | None = 400
 
     def __init__(self, dataset_loader: DatasetLoader, mmrs: MultiMediaRetrievalSystem):
-        self.dataset_loader: DatasetLoader = dataset_loader or DatasetLoader()
-        self.mmrs: MultiMediaRetrievalSystem = mmrs or MultiMediaRetrievalSystem()
+        self.dataset_loader: DatasetLoader = dataset_loader
+        self.mmrs: MultiMediaRetrievalSystem = mmrs
         if not mmrs:
             self.mmrs.prepare_data(
                 self.dataset_loader.id_artist_song_album,
                 self.dataset_loader.id_url,
                 self.dataset_loader.id_genres,
             )
+        self.nr_samples: int = len(self.dataset_loader.id_artist_song_album)
 
     # TODO: use varargs here and return the dataset
     def _prepare_data(
@@ -42,9 +43,40 @@ class MetricCalculator:
                 data = data.merge(dataset, on="id")
         return data
 
+    def compute_results(
+        self,
+        ir_method: IRMethod,
+        song: str,
+        artist: str,
+        k: int,
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None] | None:
+        match ir_method:
+            case IRMethod.BASELINE:
+                results = self.mmrs.baseline(artist, song, k)
+            case IRMethod.TFIDF:
+                results = self.mmrs.tfidf(self.dataset_loader.tfidf, artist, song, k)
+            case IRMethod.BERT:
+                results = self.mmrs.bert(self.dataset_loader.bert, artist, song, k)
+            case IRMethod.BLF_SPECTRAL:
+                results = self.mmrs.blf_spectral(
+                    self.dataset_loader.blf_spectral, artist, song, k
+                )
+            case IRMethod.MUSIC_NN:
+                results = self.mmrs.music_nn(
+                    self.dataset_loader.music_nn, artist, song, k
+                )
+            case IRMethod.RESNET:
+                results = self.mmrs.resnet(self.dataset_loader.resnet, artist, song, k)
+            case IRMethod.VGG19:
+                results = self.mmrs.vgg19(self.dataset_loader.vgg19, artist, song, k)
+            case _:
+                self.logger.debug(f"IR Method '{ir_method}' not detected.")
+                return None
+        return results
+
     def compute_cov_at_n(
         self,
-        ir_method: str,
+        ir_method: IRMethod,
         k: int,
         tol: int = DISPLAY_TOL,
     ):
@@ -59,70 +91,39 @@ class MetricCalculator:
         Return:
             float: The COV@N score.
         """
-        data = self._prepare_data(
-            self.dataset_loader.id_artist_song_album,
-            self.dataset_loader.id_url,
-            self.dataset_loader.id_genres,
-        )
-
         results_set = set()
-        total_songs = self.DEBUG_RUN_NR  # len(data)
+        precision_at_k_list = list()
+        recall_at_k_list = list()
+        ndcg_at_k_list = list()
+        mrr_at_k_list = list()
+        total_songs = self.DEBUG_NR_SAMPLES or self.nr_samples
 
         for i in range(0, total_songs):
-            artist = data["artist"].iloc[i]
-            song = data["song"].iloc[i]
+            artist = self.dataset_loader.id_artist_song_album["artist"].iloc[i]
+            song = self.dataset_loader.id_artist_song_album["song"].iloc[i]
 
-            match ir_method:
-                case "Baseline":
-                    results = self.mmrs.baseline(artist, song, k).get("search_results")
-                    for result in results:
-                        results_set.add(result["id"])
-                case "TF-IDF":
-                    results = self.mmrs.tfidf(
-                        self.dataset_loader.tfidf, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        results_set.add(result["id"])
-                case "BERT":
-                    results = self.mmrs.bert(
-                        self.dataset_loader.bert, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        results_set.add(result["id"])
-                case "BLF-Spectral":
-                    results = self.mmrs.blf_spectral(
-                        self.dataset_loader.blf_spectral, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        results_set.add(result["id"])
-                case "MusicNN":
-                    results = self.mmrs.music_nn(
-                        self.dataset_loader.music_nn, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        results_set.add(result["id"])
-                case "ResNet":
-                    results = self.mmrs.resnet(
-                        self.dataset_loader.resnet, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        results_set.add(result["id"])
-                case "VGG19":
-                    results = self.mmrs.vgg19(
-                        self.dataset_loader.vgg19, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        results_set.add(result["id"])
-                case _:
-                    self.logger.debug(f"IR Method '{ir_method}' not detected.")
-                    return None
+            results = self.compute_results(ir_method, song, artist, k)
+
+            if results is not None:
+                for result in results.get("search_results"):  # type: ignore
+                    results_set.add(result["id"])
+                precision_at_k_list.append(results.get("precision"))
+                recall_at_k_list.append(results.get("recall"))
+                ndcg_at_k_list.append(results.get("ndcg"))
+                mrr_at_k_list.append(results.get("mrr"))
 
         coverage = len(results_set) / total_songs
-        return np.round(coverage, tol)
+        return (
+            np.round(coverage, tol),
+            np.mean(precision_at_k_list).round(tol),
+            np.mean(recall_at_k_list).round(tol),
+            np.mean(ndcg_at_k_list).round(tol),
+            np.mean(mrr_at_k_list).round(tol),
+        )
 
     def compute_div_at_n(
         self,
-        ir_method: str,
+        ir_method: IRMethod,
         k: int,
         tol: int = DISPLAY_TOL,
     ):
@@ -137,65 +138,33 @@ class MetricCalculator:
         Return:
             float: The DIV@N score.
         """
-        data = self._prepare_data(
-            self.dataset_loader.id_artist_song_album,
-            self.dataset_loader.id_genres,
-            self.dataset_loader.id_tags,
-        )
-        total_songs = self.DEBUG_RUN_NR  # len(data)
+        total_songs = self.DEBUG_NR_SAMPLES or self.nr_samples
         tag_set = set()
+        precision_at_k_list = list()
+        recall_at_k_list = list()
+        ndcg_at_k_list = list()
+        mrr_at_k_list = list()
 
         for i in range(0, total_songs):
-            artist = data["artist"].iloc[i]
-            song = data["song"].iloc[i]
+            artist = self.dataset_loader.id_artist_song_album["artist"].iloc[i]
+            song = self.dataset_loader.id_artist_song_album["song"].iloc[i]
 
-            match ir_method:
-                case "Baseline":
-                    results = self.mmrs.baseline(artist, song, k).get("search_results")
-                    tag_set = self._update_tag_set(results, tag_set)
-                case "TF-IDF":
-                    results = self.mmrs.tfidf(
-                        self.dataset_loader.tfidf, artist, song, k
-                    ).get("search_results")
-                    tag_set = self._update_tag_set(results, tag_set)
-                case "BERT":
-                    results = self.mmrs.bert(
-                        self.dataset_loader.bert, artist, song, k
-                    ).get("search_results")
-                    tag_set = self._update_tag_set(results, tag_set)
-                case "BLF-Spectral":
-                    results = self.mmrs.blf_spectral(
-                        self.dataset_loader.blf_spectral, artist, song, k
-                    ).get("search_results")
-                    tag_set = self._update_tag_set(results, tag_set)
-                case "MusicNN":
-                    results = self.mmrs.music_nn(
-                        self.dataset_loader.music_nn, artist, song, k
-                    ).get("search_results")
-                    tag_set = self._update_tag_set(results, tag_set)
-                case "ResNet":
-                    results = self.mmrs.resnet(
-                        self.dataset_loader.resnet, artist, song, k
-                    ).get("search_results")
-                    tag_set = self._update_tag_set(results, tag_set)
-                case "VGG19":
-                    results = self.mmrs.vgg19(
-                        self.dataset_loader.vgg19, artist, song, k
-                    ).get("search_results")
-                    tag_set = self._update_tag_set(results, tag_set)
-                case _:
-                    self.logger.debug(f"IR Method '{ir_method}' not detected.")
-                    return None
-
-        # for id in results_set:
-        #     entry: pd.DataFrame = data[data["id"] == id]
-        #     genres = set(entry["genre"].tolist()[0])
-        #     tags = entry["(tag, weight)"].tolist()[0].keys()
-        #     tags_without_genre = [tag for tag in tags if tag not in genres]
-        #     tag_set = tag_set.union(tags_without_genre)
+            results = self.compute_results(ir_method, song, artist, k)
+            if results is not None:
+                tag_set = self._update_tag_set(results.get("search_results"), tag_set)  # type: ignore
+                precision_at_k_list.append(results.get("precision"))
+                recall_at_k_list.append(results.get("recall"))
+                ndcg_at_k_list.append(results.get("ndcg"))
+                mrr_at_k_list.append(results.get("mrr"))
 
         diversity = len(tag_set) / total_songs
-        return np.round(diversity, tol)
+        return (
+            np.round(diversity, tol),
+            np.mean(precision_at_k_list).round(tol),
+            np.mean(recall_at_k_list).round(tol),
+            np.mean(ndcg_at_k_list).round(tol),
+            np.mean(mrr_at_k_list).round(tol),
+        )
 
     def _update_tag_set(self, results: List[Dict[str, Hashable | Any]], tag_set: Set):
         for result in results:
@@ -207,7 +176,7 @@ class MetricCalculator:
 
     def compute_avg_pop_at_n(
         self,
-        ir_method: str,
+        ir_method: IRMethod,
         k: int,
         tol: int = DISPLAY_TOL,
     ):
@@ -222,68 +191,33 @@ class MetricCalculator:
         Return:
             float: The AVG_POP@N score = sum of popularity of result songs / number of result songs
         """
-        data = self._prepare_data(
-            self.dataset_loader.id_artist_song_album,
-            self.dataset_loader.id_genres,
-            self.dataset_loader.id_metadata,
-        )
-        total_songs = self.DEBUG_RUN_NR  # len(data)
+        total_songs = self.DEBUG_NR_SAMPLES or self.nr_samples
         pop_list = list()
+        precision_at_k_list = list()
+        recall_at_k_list = list()
+        ndcg_at_k_list = list()
+        mrr_at_k_list = list()
 
         for i in range(0, total_songs):
-            artist = data["artist"].iloc[i]
-            song = data["song"].iloc[i]
+            artist = self.dataset_loader.id_artist_song_album["artist"].iloc[i]
+            song = self.dataset_loader.id_artist_song_album["song"].iloc[i]
 
-            match ir_method:
-                case "Baseline":
-                    results = self.mmrs.baseline(artist, song, k).get("search_results")
-                    for result in results:
-                        pop_list.append(result["popularity"])
-                case "TF-IDF":
-                    results = self.mmrs.tfidf(
-                        self.dataset_loader.tfidf, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        pop_list.append(result["popularity"])
-                case "BERT":
-                    results = self.mmrs.bert(
-                        self.dataset_loader.bert, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        pop_list.append(result["popularity"])
-                case "BLF-Spectral":
-                    results = self.mmrs.blf_spectral(
-                        self.dataset_loader.blf_spectral, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        pop_list.append(result["popularity"])
-                case "MusicNN":
-                    results = self.mmrs.music_nn(
-                        self.dataset_loader.music_nn, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        pop_list.append(result["popularity"])
-                case "ResNet":
-                    results = self.mmrs.resnet(
-                        self.dataset_loader.resnet, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        pop_list.append(result["popularity"])
-                case "VGG19":
-                    results = self.mmrs.vgg19(
-                        self.dataset_loader.vgg19, artist, song, k
-                    ).get("search_results")
-                    for result in results:
-                        pop_list.append(result["popularity"])
-                case _:
-                    self.logger.debug(f"IR Method '{ir_method}' not detected.")
-                    return None
+            results = self.compute_results(ir_method, song, artist, k)
+            if results is not None:
+                for result in results.get("search_results"):  # type: ignore
+                    pop_list.append(result["popularity"])  # type: ignore
+                precision_at_k_list.append(results.get("precision"))
+                recall_at_k_list.append(results.get("recall"))
+                ndcg_at_k_list.append(results.get("ndcg"))
+                mrr_at_k_list.append(results.get("mrr"))
 
         total_popularity = sum(pop_list)
-        # for id in pop_list:
-        #     entry: pd.DataFrame = data[data["id"] == id]
-        #     popularity = entry["popularity"].tolist()[0]
-        #     total_popularity += popularity
 
         diversity = total_popularity / len(pop_list)
-        return np.round(diversity, tol)
+        return (
+            np.round(diversity, tol),
+            np.mean(precision_at_k_list).round(tol),
+            np.mean(recall_at_k_list).round(tol),
+            np.mean(ndcg_at_k_list).round(tol),
+            np.mean(mrr_at_k_list).round(tol),
+        )
