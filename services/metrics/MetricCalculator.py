@@ -37,7 +37,6 @@ class MetricCalculator:
                 data = data.merge(dataset, on="id")
         return data
 
-
     def compute_cov_at_n(
             self,
             ir_method: str,

@@ -39,8 +39,15 @@ logger: logging.Logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # TODO: How to test MetricCalculator (switch logging level to WARNING when testing)
-# metric_calculator = MetricCalculator()
-# print(metric_calculator.compute_avg_pop_at_n(IRMethod.TFIDF.value, 10, dataset_loader.tfidf))
+metric_calculator = MetricCalculator()
+# print(f"AVGPOP@N for Baseline: {metric_calculator.compute_avg_pop_at_n(IRMethod.BASELINE.value, 10, dataset_loader.tfidf)}")
+# print(f"AVGPOP@N for TFIDF: {metric_calculator.compute_avg_pop_at_n(IRMethod.TFIDF.value, 10, dataset_loader.tfidf)}")
+# print()
+# print(f"COV@N for Baseline: {metric_calculator.compute_cov_at_n(IRMethod.BASELINE.value, 2, dataset_loader.tfidf)}")
+# print(f"COV@N for TFIDF: {metric_calculator.compute_cov_at_n(IRMethod.TFIDF.value, 2, dataset_loader.tfidf)}")
+# print()
+# print(f"DIV@N for Baseline: {metric_calculator.compute_div_at_n(IRMethod.BASELINE.value, 10, dataset_loader.tfidf)}")
+# print(f"DIV@N for TFIDF: {metric_calculator.compute_div_at_n(IRMethod.TFIDF.value, 10, dataset_loader.tfidf)}")
 
 
 # Functionality of the home page
