@@ -80,18 +80,10 @@ def home():
                 ir_results = mmrs.resnet(dataset_loader.resnet, artist, song_title, N)
             case IRMethod.VGG19.value:
                 border_color = BorderColor.BROWN.value
-                ir_results = mmrs.vgg19(
-                    dataset_loader.vgg19,
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.vgg19(dataset_loader.vgg19, artist, song_title, N)
             case IRMethod.LLM.value:
                 border_color = BorderColor.YELLOW.value
-                ir_results = mmrs.llm(
-                    dataset_loader.llm,
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.llm(dataset_loader.llm, artist, song_title, N)
             case _:  # default case not implemented
                 raise NotImplementedError("Default method not implemented yet")
 
