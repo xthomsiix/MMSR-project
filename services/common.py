@@ -10,3 +10,4 @@ class IRMethod(Enum):
     MUSIC_NN = "MusicNN"
     RESNET = "ResNet"
     VGG19 = "VGG19"
+    LLM = "LLM"
