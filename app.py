@@ -33,6 +33,7 @@ class BorderColor(Enum):
     PURPLE = "purple"
     MAROON = "maroon"
     BROWN = "brown"
+    YELLOW = "yellow"
 
 
 # initialize logger
@@ -108,6 +109,13 @@ def home():
                 border_color = BorderColor.BROWN.value
                 ir_results = mmrs.vgg19(
                     dataset_loader.vgg19,
+                    artist,
+                    song_title,
+                )
+            case IRMethod.LLM.value:
+                border_color = BorderColor.YELLOW.value
+                ir_results = mmrs.llm(
+                    dataset_loader.llm, 
                     artist,
                     song_title,
                 )
