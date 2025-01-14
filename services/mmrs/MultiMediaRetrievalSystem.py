@@ -481,7 +481,7 @@ class MultiMediaRetrievalSystem:
         llm: pd.DataFrame,
         artist: str | None,
         song_title: str | None,
-        N: int = 10,
+        N: int = 5,
     ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
         """
         Performs an LLM-based search for the most similar songs.
@@ -502,15 +502,21 @@ class MultiMediaRetrievalSystem:
         dataset = df_clean.set_index(
             "id"
         ).T.to_dict()  # convert to dictionary to be passed in the prompt
-        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N}"""  # noqa: E501
+        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N+2}""" 
         prompt = f"""<purpose>You are a music expert that suggests similar songs based on a given artist and song title. You will be given a music dataset with artists and songs from which you have to make your picks.</purpose>
                      <instructions>You will be provided what number of similar songs you should suggest in the input by the user.</instructions>
                      <instructions>Pick said number of songs that you think are most similar from the dataset.</instructions>
+                     <instructions>Do NOT include the ID of the song given by the user in the suggestions</instructions>
                      <instructions>Rank them based on how similar you think they are, starting with the most similar</instructions>
-                     <instructions>You should only return the song ids collected in a python list, nothing else(adhere to template provided)<instructions>
-                     <template>
+                     <instructions>Here is a step by step approach to solve this task which you should follow:
+                                   1. You search for a similar song
+                                   2. Once you find the most similar one, you add it's ID to the list
+                                   3. You then search for the second most similar one, add it's ID to the list
+                                   4. Repeat until you have collected the number of song requested by the user</instructions>
+                     <instructions>You should only return the song IDs collected in a python list, nothing else(adhere to the output template provided)<instructions>
+                     <output_template>
                      ["zyz0UbYN4n9rHXex","zyzILCQvVeUFIINi","zzx8CWdM7qkxKQpC"]
-                     </template>
+                     </output_template>
                      <music_dataset>
                      {dataset}
                      </music_dataset>
@@ -527,7 +533,13 @@ class MultiMediaRetrievalSystem:
         list_str = match.group(0)  # Get the string within the brackets
         result_list = eval(list_str)  # Convert the string to an actual Python list
 
-        query_result: pd.DataFrame = self.data.loc[self.data["id"].isin(result_list)]
+        input_song_id = query_item["id"].values[0] #get ID of input song
+        query_result: pd.DataFrame = self.data.loc[self.data["id"].isin(result_list)]  #get all existing song suggestions
+        if input_song_id in query_result["id"].values and len(query_result) > N: #check if the model returned more than N existing IDs and remove the input song from the results if present
+            query_result = query_result[query_result["id"] != input_song_id]
+    
+        # Take the top N suggestions (after removal if applicable)
+        query_result = query_result.head(N)
 
         # Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
