@@ -475,30 +475,34 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
-    
+
     def llm(
         self,
         llm: pd.DataFrame,
         artist: str | None,
         song_title: str | None,
         N: int = 10,
-    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
-         """
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
+        """
         Performs an LLM-based search for the most similar songs.
         """
         self.logger.debug(
             f"Generating LLM-based search results for {artist} - {song_title}"
         )
-        
+
         query_item = self.retrieve_query_item(self.data, artist, song_title)
         if query_item is None:
             return self.FALLBACK_RESULTS
-        
+
         genai.configure(api_key="AIzaSyBq5Lei_jSVHgFwiYbB5e0rGbiHg7lLyQg")
         model = genai.GenerativeModel("gemini-1.5-flash")
-        df_clean = llm.drop(llm.columns[-1], axis=1) #drop album column as it is not needed
-        dataset = df_clean.set_index("id").T.to_dict() #convert to dictionary to be passed in the prompt
-        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N}"""
+        df_clean = llm.drop(
+            llm.columns[-1], axis=1
+        )  # drop album column as it is not needed
+        dataset = df_clean.set_index(
+            "id"
+        ).T.to_dict()  # convert to dictionary to be passed in the prompt
+        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N}"""  # noqa: E501
         prompt = f"""<purpose>You are a music expert that suggests similar songs based on a given artist and song title. You will be given a music dataset with artists and songs from which you have to make your picks.</purpose>
                      <instructions>You will be provided what number of similar songs you should suggest in the input by the user.</instructions>
                      <instructions>Pick said number of songs that you think are most similar from the dataset.</instructions>
@@ -513,16 +517,19 @@ class MultiMediaRetrievalSystem:
                      <user_input>
                      {input_query}
                      </user_input>
-        """
+        """  # noqa: E501
         response = model.generate_content(prompt)
         answer = response.text
-        match = re.search(r"\[.*?\]", answer)
+        match: re.Match[str] | None = re.search(r"\[.*?\]", answer)
+        if match is None:
+            self.logger.warning("No search results found")
+            return self.FALLBACK_RESULTS
         list_str = match.group(0)  # Get the string within the brackets
         result_list = eval(list_str)  # Convert the string to an actual Python list
-        
+
         query_result: pd.DataFrame = self.data.loc[self.data["id"].isin(result_list)]
-        
-        #Compute metrics
+
+        # Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
         recall: float = self._compute_recall_at_k(query_result, query_item, N)
         ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
