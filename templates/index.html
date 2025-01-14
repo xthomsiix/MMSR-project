@@ -26,6 +26,14 @@
             background-color: #222;
             color: #e0e0e0;
         }
+        input[type="number"] {
+            width: 100px;
+            padding: 10px;
+            border: 2px solid #555; /* Default border color */
+            border-radius: 5px;
+            background-color: #222;
+            color: #e0e0e0;
+        }
         select {
             padding: 10px;
             border-radius: 5px;
@@ -131,6 +139,15 @@
                 <option value="{{ songTitle }}"></option>
                 {% endfor %}
             </datalist>
+            <input
+                id="numResults"
+                type="number"
+                name="numResults"
+                placeholder="Number of Results"
+                min="1"
+                max="100"
+                value="{{ num_results | default(10) }}"
+                style="border-color: {{ border_color }};">
             <button type="submit">Search</button>
             <button type="button" id="clearButton" onclick="clearForm()">Clear</button>
         </form>

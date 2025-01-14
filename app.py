@@ -2,8 +2,6 @@ from enum import Enum
 import logging
 from typing import Any, Dict, Hashable, List
 from flask import Flask, render_template, request
-
-from services.metrics import MetricCalculator
 from services.mmrs import MultiMediaRetrievalSystem
 from services.data import DatasetLoader
 from services.common import IRMethod
@@ -15,6 +13,7 @@ logging.basicConfig(
 )
 
 dataset_loader: DatasetLoader = DatasetLoader()
+dataset_loader.load()
 mmrs: MultiMediaRetrievalSystem = MultiMediaRetrievalSystem()
 mmrs.prepare_data(
     dataset_loader.id_artist_song_album,
@@ -41,14 +40,6 @@ logger: logging.Logger = logging.getLogger(__name__)
 # initialize Flask app
 app = Flask(__name__)
 
-# TODO: How to test MetricCalculator (switch logging level to WARNING when testing)
-# metric_calculator = MetricCalculator(dataset_loader, mmrs)
-# for method in IRMethod:
-#     print(method.value)
-#     print("Popularity", metric_calculator.compute_avg_pop_at_n(method, 10))
-#     print("Coverage", metric_calculator.compute_cov_at_n(method, 10))
-#     print("Diversity", metric_calculator.compute_div_at_n(method, 10))
-
 
 # Functionality of the home page
 @app.route("/", methods=["GET", "POST"])
@@ -56,6 +47,7 @@ def home():
     # initialize global variables for text fields with default values
     artist: str | None = request.form.get("artist")
     song_title: str | None = request.form.get("songTitle")
+    N: int = int(request.form.get("numResults", 10))
     selected_iir = request.form.get("option", IRMethod.BASELINE.value)
     border_color: str | None = BorderColor.RED.value
     ir_results: Dict[str, str | float | List[Dict[Hashable, Any]] | None] = {}
@@ -65,52 +57,29 @@ def home():
         match selected_iir:
             case IRMethod.BASELINE.value:
                 border_color = BorderColor.RED.value
-                ir_results = mmrs.baseline(
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.baseline(artist, song_title, N)
             case IRMethod.TFIDF.value:
                 border_color = BorderColor.GREEN.value
-                ir_results = mmrs.tfidf(
-                    dataset_loader.tfidf,
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.tfidf(dataset_loader.tfidf, artist, song_title, N)
             case IRMethod.BERT.value:
                 border_color = BorderColor.BLUE.value
-                ir_results = mmrs.bert(
-                    dataset_loader.bert,
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.bert(dataset_loader.bert, artist, song_title, N)
             case IRMethod.BLF_SPECTRAL.value:
                 border_color = BorderColor.ORANGE.value
                 ir_results = mmrs.blf_spectral(
-                    dataset_loader.blf_spectral,
-                    artist,
-                    song_title,
+                    dataset_loader.blf_spectral, artist, song_title, N
                 )
             case IRMethod.MUSIC_NN.value:
                 border_color = BorderColor.PURPLE.value
                 ir_results = mmrs.music_nn(
-                    dataset_loader.music_nn,
-                    artist,
-                    song_title,
+                    dataset_loader.music_nn, artist, song_title, N
                 )
             case IRMethod.RESNET.value:
                 border_color = BorderColor.MAROON.value
-                ir_results = mmrs.resnet(
-                    dataset_loader.resnet,
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.resnet(dataset_loader.resnet, artist, song_title, N)
             case IRMethod.VGG19.value:
                 border_color = BorderColor.BROWN.value
-                ir_results = mmrs.vgg19(
-                    dataset_loader.vgg19,
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.vgg19(dataset_loader.vgg19, artist, song_title, N)
             case _:  # default case not implemented
                 raise NotImplementedError("Default method not implemented yet")
 

@@ -7,4 +7,7 @@
     "flake8.args": [
         "--max-line-length=110"
     ],
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
 }

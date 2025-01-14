@@ -1,8 +1,10 @@
 import logging
+import random
 from typing import Any, Dict, Hashable, List, Set
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from services.common import IRMethod
 from services.mmrs import MultiMediaRetrievalSystem
@@ -25,7 +27,6 @@ class MetricCalculator:
             )
         self.nr_samples: int = len(self.dataset_loader.id_artist_song_album)
 
-    # TODO: use varargs here and return the dataset
     def _prepare_data(
         self,
         *datasets: pd.DataFrame,
@@ -74,10 +75,32 @@ class MetricCalculator:
                 return None
         return results
 
+    def get_sample(self, sample_size: int):
+        assert (
+            sample_size <= self.nr_samples
+        ), "Sample size is larger than the number of samples"
+
+        random_song_ids: List[int] = random.sample(range(self.nr_samples), sample_size)
+        assert len(set(random_song_ids)) == len(random_song_ids)
+
+        artists: List[str] = (
+            self.dataset_loader.id_artist_song_album["artist"]
+            .iloc[random_song_ids]
+            .values.tolist()
+        )  # type: ignore
+        songs: List[str] = (
+            self.dataset_loader.id_artist_song_album["song"]
+            .iloc[random_song_ids]
+            .values.tolist()
+        )  # type: ignore
+
+        return artists, songs
+
     def compute_cov_at_n(
         self,
         ir_method: IRMethod,
-        k: int,
+        sample_size: int,
+        N: int,
         tol: int = DISPLAY_TOL,
     ):
         """Computes the COV@N metric
@@ -96,13 +119,10 @@ class MetricCalculator:
         recall_at_k_list = list()
         ndcg_at_k_list = list()
         mrr_at_k_list = list()
-        total_songs = self.DEBUG_NR_SAMPLES or self.nr_samples
+        artists, songs = self.get_sample(sample_size)
 
-        for i in range(0, total_songs):
-            artist = self.dataset_loader.id_artist_song_album["artist"].iloc[i]
-            song = self.dataset_loader.id_artist_song_album["song"].iloc[i]
-
-            results = self.compute_results(ir_method, song, artist, k)
+        for artist, song in tqdm(zip(artists, songs)):
+            results = self.compute_results(ir_method, song, artist, N)
 
             if results is not None:
                 for result in results.get("search_results"):  # type: ignore
@@ -112,7 +132,7 @@ class MetricCalculator:
                 ndcg_at_k_list.append(results.get("ndcg"))
                 mrr_at_k_list.append(results.get("mrr"))
 
-        coverage = len(results_set) / total_songs
+        coverage = len(results_set) / sample_size
         return (
             np.round(coverage, tol),
             np.mean(precision_at_k_list).round(tol),
@@ -124,7 +144,8 @@ class MetricCalculator:
     def compute_div_at_n(
         self,
         ir_method: IRMethod,
-        k: int,
+        sample_size: int,
+        N: int,
         tol: int = DISPLAY_TOL,
     ):
         """Computes the DIV@N metric
@@ -138,18 +159,16 @@ class MetricCalculator:
         Return:
             float: The DIV@N score.
         """
-        total_songs = self.DEBUG_NR_SAMPLES or self.nr_samples
         tag_set = set()
         precision_at_k_list = list()
         recall_at_k_list = list()
         ndcg_at_k_list = list()
         mrr_at_k_list = list()
+        artists, songs = self.get_sample(sample_size)
 
-        for i in range(0, total_songs):
-            artist = self.dataset_loader.id_artist_song_album["artist"].iloc[i]
-            song = self.dataset_loader.id_artist_song_album["song"].iloc[i]
+        for artist, song in tqdm(zip(artists, songs)):
+            results = self.compute_results(ir_method, song, artist, N)
 
-            results = self.compute_results(ir_method, song, artist, k)
             if results is not None:
                 tag_set = self._update_tag_set(results.get("search_results"), tag_set)  # type: ignore
                 precision_at_k_list.append(results.get("precision"))
@@ -157,7 +176,7 @@ class MetricCalculator:
                 ndcg_at_k_list.append(results.get("ndcg"))
                 mrr_at_k_list.append(results.get("mrr"))
 
-        diversity = len(tag_set) / total_songs
+        diversity = len(tag_set) / sample_size
         return (
             np.round(diversity, tol),
             np.mean(precision_at_k_list).round(tol),
@@ -177,7 +196,8 @@ class MetricCalculator:
     def compute_avg_pop_at_n(
         self,
         ir_method: IRMethod,
-        k: int,
+        sample_size: int,
+        N: int,
         tol: int = DISPLAY_TOL,
     ):
         """Computes the AVG_POP@N metric
@@ -191,33 +211,39 @@ class MetricCalculator:
         Return:
             float: The AVG_POP@N score = sum of popularity of result songs / number of result songs
         """
-        total_songs = self.DEBUG_NR_SAMPLES or self.nr_samples
-        pop_list = list()
+        total_popularity = 0.0
         precision_at_k_list = list()
         recall_at_k_list = list()
         ndcg_at_k_list = list()
         mrr_at_k_list = list()
+        artists, songs = self.get_sample(sample_size)
 
-        for i in range(0, total_songs):
-            artist = self.dataset_loader.id_artist_song_album["artist"].iloc[i]
-            song = self.dataset_loader.id_artist_song_album["song"].iloc[i]
-
-            results = self.compute_results(ir_method, song, artist, k)
+        for artist, song in tqdm(zip(artists, songs)):
+            results = self.compute_results(ir_method, song, artist, N)
             if results is not None:
                 for result in results.get("search_results"):  # type: ignore
-                    pop_list.append(result["popularity"])  # type: ignore
+                    total_popularity += result["popularity"]  # type: ignore
                 precision_at_k_list.append(results.get("precision"))
                 recall_at_k_list.append(results.get("recall"))
                 ndcg_at_k_list.append(results.get("ndcg"))
                 mrr_at_k_list.append(results.get("mrr"))
 
-        total_popularity = sum(pop_list)
-
-        diversity = total_popularity / len(pop_list)
+        avg_pop = total_popularity / sample_size
         return (
-            np.round(diversity, tol),
+            np.round(avg_pop, tol),
             np.mean(precision_at_k_list).round(tol),
             np.mean(recall_at_k_list).round(tol),
             np.mean(ndcg_at_k_list).round(tol),
             np.mean(mrr_at_k_list).round(tol),
         )
+
+    def compute_optimized_div_at_n(
+        self,
+        ir_method: IRMethod,
+        sample_size: int,
+        N: int,
+        tol: int = DISPLAY_TOL,
+    ):
+        cumulative_ndcg = 0.0
+        artists, songs = self.get_sample(sample_size)
+        pass
