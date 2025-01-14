@@ -110,6 +110,7 @@
                 <option value="MusicNN" {% if selected_option == 'MusicNN' %}selected{% endif %}>MusicNN</option>
                 <option value="ResNet" {% if selected_option == 'ResNet' %}selected{% endif %}>ResNet</option>
                 <option value="VGG19" {% if selected_option == 'VGG19' %}selected{% endif %}>VGG19</option>
+                <option value="LLM" {% if selected_option == 'LLM' %}selected{% endif %}>LLM</option>
             </select>
             <!-- Input (query) to the IR system is the title and artist of a song (track) -->
             <input
@@ -233,6 +234,10 @@
                     case "VGG19":
                         artist.style.borderColor = "brown";
                         songTitle.style.borderColor = "brown";
+                        break;
+                    case "LLM":
+                        artist.style.borderColor = "yellow";
+                        songTitle.style.borderColor = "yellow";
                         break;
                     default:
                         artist.style.borderColor = "black";

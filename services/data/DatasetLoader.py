@@ -88,6 +88,7 @@ class DatasetLoader:
         self.vgg19: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
             self._load("id_vgg19_mmsr.tsv")
         )
+        self.llm: pd.DataFrame = self._load("id_information_mmsr.tsv")
 
     def _download_dataset(self) -> None:
         """Download the dataset from the given URL."""
