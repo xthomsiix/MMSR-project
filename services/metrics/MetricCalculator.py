@@ -69,6 +69,8 @@ class MetricCalculator:
                 results = self.mmrs.resnet(self.dataset_loader.resnet, artist, song, k)
             case IRMethod.VGG19:
                 results = self.mmrs.vgg19(self.dataset_loader.vgg19, artist, song, k)
+            case IRMethod.LLM:
+                results = self.mmrs.llm(self.dataset_loader.llm, artist, song, k)
             case _:
                 self.logger.debug(f"IR Method '{ir_method}' not detected.")
                 return None
