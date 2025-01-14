@@ -1,11 +1,10 @@
-""""""
-
+from transformers import BertTokenizer, BertModel
+import torch
 import logging
 import os
 from typing import Any, Callable, Dict, Literal
 import numpy as np
 import pandas as pd
-
 
 class DatasetLoader:
     DATASET_PATH: str = "dataset"
@@ -45,10 +44,15 @@ class DatasetLoader:
 
         # load all necessary files
         self.id_artist_song_album: pd.DataFrame = self._load("id_information_mmsr.tsv")
+        print(self.id_artist_song_album.head())  # Add this line to debug
         self.id_url: pd.DataFrame = self._load("id_url_mmsr.tsv")
+        print(self.id_url.head())  # Add this line to debug
         self.id_genres: pd.DataFrame = self._load("id_genres_mmsr.tsv", {"genre": eval})
+        print(self.id_genres.head())  # Add this line to debug
         self.id_tags: pd.DataFrame = self._load("id_tags_dict.tsv", {"(tag, weight)": eval})
+        print(self.id_tags.head())  # Add this line to debug
         self.id_metadata: pd.DataFrame = self._load("id_metadata_mmsr.tsv", {"popularity": eval})
+        print(self.id_metadata.head())  # Add this line to debug
         self.tfidf: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
             self._load("id_lyrics_tf-idf_mmsr.tsv")
         )
@@ -66,6 +70,11 @@ class DatasetLoader:
         )
         self.vgg19: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
             self._load("id_vgg19_mmsr.tsv")
+        )
+
+        # Load the BERT embeddings directly
+        self.bert_embeddings: np.ndarray[Any, np.dtype[np.float64]] = self._convert_to_numpy(
+            self._load("id_lyrics_bert_mmsr.tsv")
         )
 
     def _load(

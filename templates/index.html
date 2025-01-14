@@ -94,7 +94,7 @@
     <div class="search-bar">
         <form id="searchForm" method="POST">
             <select id="searchOption" name="option" onchange="changeBorderColor()">
-                <!-- TODO: Here we can specify the IIR method options -->
+                <!-- Add the new IR method option -->
                 <option value="Baseline" {% if selected_option == 'Baseline' %}selected{% endif %}>Baseline</option>
                 <option value="TF-IDF" {% if selected_option == 'TF-IDF' %}selected{% endif %}>TF-IDF</option>
                 <option value="BERT" {% if selected_option == 'BERT' %}selected{% endif %}>BERT</option>
@@ -102,6 +102,9 @@
                 <option value="MusicNN" {% if selected_option == 'MusicNN' %}selected{% endif %}>MusicNN</option>
                 <option value="ResNet" {% if selected_option == 'ResNet' %}selected{% endif %}>ResNet</option>
                 <option value="VGG19" {% if selected_option == 'VGG19' %}selected{% endif %}>VGG19</option>
+                <option value="BERT-Embeddings" {% if selected_option == 'BERT-Embeddings' %}selected{% endif %}>BERT-Embeddings</option> <!-- Add this line -->
+                <option value="Early-Fusion" {% if selected_option == 'Early-Fusion' %}selected{% endif %}>Early Fusion</option>
+                <option value="Late-Fusion" {% if selected_option == 'Late-Fusion' %}selected{% endif %}>Late Fusion</option>
             </select>
             <!-- Input (query) to the IR system is the title and artist of a song (track) -->
             <input
@@ -135,6 +138,7 @@
             <button type="button" id="clearButton" onclick="clearForm()">Clear</button>
         </form>
     </div>
+    
     <div class="search-results">
         <h3 id="seachResultsHeading">
             Search Results: 
@@ -217,13 +221,25 @@
                         artist.style.borderColor = "brown";
                         songTitle.style.borderColor = "brown";
                         break;
+                    case "BERT-Embeddings":  // Add this case
+                        artist.style.borderColor = "blue";
+                        songTitle.style.borderColor = "blue";
+                        break;
+                    case "Early-Fusion":
+                        artist.style.borderColor = "cyan";
+                        songTitle.style.borderColor = "cyan";
+                        break;
+                    case "Late-Fusion":
+                        artist.style.borderColor = "magenta";
+                        songTitle.style.borderColor = "magenta";
+                        break;
                     default:
                         artist.style.borderColor = "black";
                         songTitle.style.borderColor = "black";
                         break;
                 }
             }
-
+            
             function sortTable(columnIndex, isNumeric) {
                 const table = document.getElementById("resultsTable");
                 const rows = Array.from(table.rows).slice(1); // Exclude header row
