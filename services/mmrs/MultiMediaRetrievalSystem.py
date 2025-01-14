@@ -6,6 +6,9 @@ from typing import Any, Dict, Hashable, List, Set
 import numpy as np
 import pandas as pd
 
+import re
+import google.generativeai as genai
+
 
 class MultiMediaRetrievalSystem:
     logger: logging.Logger = logging.getLogger(__name__)
@@ -430,6 +433,68 @@ class MultiMediaRetrievalSystem:
         query_result: pd.DataFrame = self.data.iloc[top_N_indices]
 
         # Compute metrics
+        precision: float = self._compute_precision_at_k(query_result, query_item, N)
+        recall: float = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = self.get_formatted_search_results(query_result)
+        return {
+            "search_results": search_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
+    
+    def llm(
+        self,
+        llm: pd.DataFrame,
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[str, str]] | None]:
+         """
+        Performs an LLM-based search for the most similar songs.
+        """
+        self.logger.debug(
+            f"Generating LLM-based search results for {artist} - {song_title}"
+        )
+        
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+        
+        genai.configure(api_key="AIzaSyBq5Lei_jSVHgFwiYbB5e0rGbiHg7lLyQg")
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        df_clean = llm.drop(llm.columns[-1], axis=1) #drop album column as it is not needed
+        dataset = df_clean.set_index("id").T.to_dict() #convert to dictionary to be passed in the prompt
+        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N}"""
+        prompt = f"""<purpose>You are a music expert that suggests similar songs based on a given artist and song title. You will be given a music dataset with artists and songs from which you have to make your picks.</purpose>
+                     <instructions>You will be provided what number of similar songs you should suggest in the input by the user.</instructions>
+                     <instructions>Pick said number of songs that you think are most similar from the dataset.</instructions>
+                     <instructions>Rank them based on how similar you think they are, starting with the most similar</instructions>
+                     <instructions>You should only return the song ids collected in a python list, nothing else(adhere to template provided)<instructions>
+                     <template>
+                     ["zyz0UbYN4n9rHXex","zyzILCQvVeUFIINi","zzx8CWdM7qkxKQpC"]
+                     </template>
+                     <music_dataset>
+                     {dataset}
+                     </music_dataset>
+                     <user_input>
+                     {input_query}
+                     </user_input>
+        """
+        response = model.generate_content(prompt)
+        answer = response.text
+        match = re.search(r"\[.*?\]", answer)
+        list_str = match.group(0)  # Get the string within the brackets
+        result_list = eval(list_str)  # Convert the string to an actual Python list
+        
+        query_result: pd.DataFrame = self.data.loc[self.data["id"].isin(result_list)]
+        
+        #Compute metrics
         precision: float = self._compute_precision_at_k(query_result, query_item, N)
         recall: float = self._compute_recall_at_k(query_result, query_item, N)
         ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
