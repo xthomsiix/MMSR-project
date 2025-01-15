@@ -22,7 +22,6 @@ mmrs.prepare_data(
     dataset_loader.id_metadata,
     dataset_loader.id_tags,
 )
-metric_calculator = MetricCalculator(dataset_loader, mmrs)
 
 
 class BorderColor(Enum):
@@ -33,6 +32,7 @@ class BorderColor(Enum):
     PURPLE = "purple"
     MAROON = "maroon"
     BROWN = "brown"
+    YELLOW = "yellow"
 
 
 # initialize logger
@@ -86,7 +86,7 @@ def home():
             case IRMethod.BERT_EMBEDDINGS.value:
                 border_color = BorderColor.BLUE.value
                 ir_results = mmrs.bert_embeddings(
-                    dataset_loader.bert_embeddings,
+                    dataset_loader.bert,
                     artist,
                     song_title,
                 )

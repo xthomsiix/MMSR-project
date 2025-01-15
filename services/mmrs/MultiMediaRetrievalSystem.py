@@ -502,7 +502,7 @@ class MultiMediaRetrievalSystem:
         dataset = df_clean.set_index(
             "id"
         ).T.to_dict()  # convert to dictionary to be passed in the prompt
-        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N+2}""" 
+        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N+2}"""
         prompt = f"""<purpose>You are a music expert that suggests similar songs based on a given artist and song title. You will be given a music dataset with artists and songs from which you have to make your picks.</purpose>
                      <instructions>You will be provided what number of similar songs you should suggest in the input by the user.</instructions>
                      <instructions>Pick said number of songs that you think are most similar from the dataset.</instructions>
@@ -533,11 +533,15 @@ class MultiMediaRetrievalSystem:
         list_str = match.group(0)  # Get the string within the brackets
         result_list = eval(list_str)  # Convert the string to an actual Python list
 
-        input_song_id = query_item["id"].values[0] #get ID of input song
-        query_result: pd.DataFrame = self.data.loc[self.data["id"].isin(result_list)]  #get all existing song suggestions
-        if input_song_id in query_result["id"].values and len(query_result) > N: #check if the model returned more than N existing IDs and remove the input song from the results if present
+        input_song_id = query_item["id"].values[0]  # get ID of input song
+        query_result: pd.DataFrame = self.data.loc[
+            self.data["id"].isin(result_list)
+        ]  # get all existing song suggestions
+        if (
+            input_song_id in query_result["id"].values and len(query_result) > N
+        ):  # check if the model returned more than N existing IDs and remove the input song from the results if present
             query_result = query_result[query_result["id"] != input_song_id]
-    
+
         # Take the top N suggestions (after removal if applicable)
         query_result = query_result.head(N)
 
@@ -664,6 +668,7 @@ class MultiMediaRetrievalSystem:
         ndcg: float = dcg / idcg
         self.logger.debug(f"NDCG@{k}: {ndcg}")
         return np.round(ndcg, tol)
+
     def bert_embeddings(
         self,
         bert_embeddings: np.ndarray[Any, np.dtype[np.float64]],
@@ -715,6 +720,7 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
+
     def early_fusion(
         self,
         tfidf: np.ndarray[Any, np.dtype[np.float64]],
@@ -723,16 +729,24 @@ class MultiMediaRetrievalSystem:
         song_title: str | None,
         N: int = 10,
     ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
-        self.logger.debug(f"Generating early fusion search results for {artist} - {song_title}")
+        self.logger.debug(
+            f"Generating early fusion search results for {artist} - {song_title}"
+        )
 
         query_item = self.retrieve_query_item(self.data, artist, song_title)
         if query_item is None:
             return self.FALLBACK_RESULTS
 
         # Combine features
-        query_item_tfidf = tfidf[self.data.index[self.data["id"] == query_item["id"].values[0]]]
-        query_item_bert = bert[self.data.index[self.data["id"] == query_item["id"].values[0]]]
-        combined_query_item = np.concatenate((query_item_tfidf, query_item_bert), axis=1)
+        query_item_tfidf = tfidf[
+            self.data.index[self.data["id"] == query_item["id"].values[0]]
+        ]
+        query_item_bert = bert[
+            self.data.index[self.data["id"] == query_item["id"].values[0]]
+        ]
+        combined_query_item = np.concatenate(
+            (query_item_tfidf, query_item_bert), axis=1
+        )
 
         combined_features = np.concatenate((tfidf, bert), axis=1)
         cosine_similarities = np.dot(combined_features, combined_query_item.T).flatten()
@@ -755,6 +769,7 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
+
     def late_fusion(
         self,
         tfidf_results: Dict[str, Any],
@@ -773,7 +788,9 @@ class MultiMediaRetrievalSystem:
             combined_results.append(result)
 
         # Sort combined results by score
-        combined_results = sorted(combined_results, key=lambda x: x["score"], reverse=True)[:N]
+        combined_results = sorted(
+            combined_results, key=lambda x: x["score"], reverse=True
+        )[:N]
 
         precision = (tfidf_results["precision"] + bert_results["precision"]) / 2
         recall = (tfidf_results["recall"] + bert_results["recall"]) / 2
@@ -788,6 +805,7 @@ class MultiMediaRetrievalSystem:
             "mrr": mmr,
             "message": None,
         }
+
     def _compute_mrr_at_k(
         self,
         query_result: pd.DataFrame,

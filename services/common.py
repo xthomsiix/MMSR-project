@@ -11,5 +11,6 @@ class IRMethod(Enum):
     RESNET = "ResNet"
     VGG19 = "VGG19"
     BERT_EMBEDDINGS = "BERT-Embeddings"
-    EARLY_FUSION = "Early-Fusion"  
-    LATE_FUSION = "Late-Fusion"        LLM = "LLM"
+    EARLY_FUSION = "Early-Fusion"
+    LATE_FUSION = "Late-Fusion"
+    LLM = "LLM"
