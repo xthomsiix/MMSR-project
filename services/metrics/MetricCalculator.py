@@ -124,7 +124,19 @@ class MetricCalculator:
         artists, songs = self.get_sample(sample_size)
 
         for artist, song in tqdm(zip(artists, songs)):
-            results = self.compute_results(ir_method, song, artist, N)
+            if ir_method == IRMethod.EARLY_FUSION:
+                results = self.compute_early_fusion_results(
+                    self.dataset_loader.tfidf, self.dataset_loader.bert, song, artist, k
+                )
+            elif ir_method == IRMethod.LATE_FUSION:
+                tfidf_results = self.compute_results(IRMethod.TFIDF, song, artist, k)
+                bert_results = self.compute_results(IRMethod.BERT, song, artist, k)
+                if tfidf_results is not None and bert_results is not None:
+                    results = self.compute_late_fusion_results(
+                        tfidf_results, bert_results, k
+                    )
+            else:
+                results = self.compute_results(ir_method, song, artist, N)
 
             if results is not None:
                 for result in results.get("search_results"):  # type: ignore
@@ -194,6 +206,69 @@ class MetricCalculator:
             tags_without_genre = [tag for tag in tags if tag not in genres]
             tag_set = tag_set.union(tags_without_genre)
         return tag_set
+
+    def compute_early_fusion_results(
+        self,
+        tfidf: np.ndarray[Any, np.dtype[np.float64]],
+        bert: np.ndarray[Any, np.dtype[np.float64]],
+        song: str,
+        artist: str,
+        k: int,
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None] | None:
+        results = self.mmrs.early_fusion(tfidf, bert, artist, song, k)
+        return results
+
+    def compute_late_fusion_results(
+        self,
+        tfidf_results: Dict[str, Any],
+        bert_results: Dict[str, Any],
+        k: int,
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None] | None:
+        results = self.mmrs.late_fusion(tfidf_results, bert_results, k)
+        return results
+
+    def compute_all_metrics(
+        self,
+        ir_method: IRMethod,
+        song: str,
+        artist: str,
+        k: int,
+        tol: int = DISPLAY_TOL,
+    ):
+        if ir_method == IRMethod.EARLY_FUSION:
+            results = self.compute_early_fusion_results(
+                self.dataset_loader.tfidf, self.dataset_loader.bert, song, artist, k
+            )
+        elif ir_method == IRMethod.LATE_FUSION:
+            tfidf_results = self.compute_results(IRMethod.TFIDF, song, artist, k)
+            bert_results = self.compute_results(IRMethod.BERT, song, artist, k)
+            if tfidf_results is not None and bert_results is not None:
+                results = self.compute_late_fusion_results(
+                    tfidf_results, bert_results, k
+                )
+            else:
+                results = None
+        else:
+            results = self.compute_results(ir_method, song, artist, k)
+
+        if results is not None:
+            precision = results.get("precision")
+            recall = results.get("recall")
+            ndcg = results.get("ndcg")
+            mrr = results.get("mrr")
+            coverage = self.compute_cov_at_n(ir_method, k, tol)
+            diversity = self.compute_div_at_n(ir_method, k, tol)
+            avg_popularity = self.compute_avg_pop_at_n(ir_method, k, tol)
+            return {
+                "precision": precision,
+                "recall": recall,
+                "ndcg": ndcg,
+                "mrr": mrr,
+                "coverage": coverage,
+                "diversity": diversity,
+                "avg_popularity": avg_popularity,
+            }
+        return None
 
     def compute_avg_pop_at_n(
         self,

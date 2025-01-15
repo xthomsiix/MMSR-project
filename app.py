@@ -4,7 +4,7 @@ from typing import Any, Dict, Hashable, List
 from flask import Flask, render_template, request
 from services.mmrs import MultiMediaRetrievalSystem
 from services.data import DatasetLoader
-from services.common import IRMethod
+from services.common import IRMethod  # Ensure this is the only import for IRMethod
 
 # Configure the main logger for the application
 logging.basicConfig(
@@ -22,6 +22,7 @@ mmrs.prepare_data(
     dataset_loader.id_metadata,
     dataset_loader.id_tags,
 )
+metric_calculator = MetricCalculator(dataset_loader, mmrs)
 
 
 class BorderColor(Enum):
@@ -32,7 +33,6 @@ class BorderColor(Enum):
     PURPLE = "purple"
     MAROON = "maroon"
     BROWN = "brown"
-    YELLOW = "yellow"
 
 
 # initialize logger
@@ -54,7 +54,6 @@ def home():
     ir_results: Dict[str, str | float | List[Dict[Hashable, Any]] | None] = {}
 
     if request.method == "POST" and artist and song_title:
-        # make a switch case for the different IIR methods
         match selected_iir:
             case IRMethod.BASELINE.value:
                 border_color = BorderColor.RED.value
@@ -84,6 +83,40 @@ def home():
             case IRMethod.LLM.value:
                 border_color = BorderColor.YELLOW.value
                 ir_results = mmrs.llm(dataset_loader.llm, artist, song_title, N)
+            case IRMethod.BERT_EMBEDDINGS.value:
+                border_color = BorderColor.BLUE.value
+                ir_results = mmrs.bert_embeddings(
+                    dataset_loader.bert_embeddings,
+                    artist,
+                    song_title,
+                )
+            case IRMethod.EARLY_FUSION.value:
+                border_color = "cyan"
+                ir_results = mmrs.early_fusion(
+                    dataset_loader.tfidf,
+                    dataset_loader.bert,
+                    artist,
+                    song_title,
+                )
+            case IRMethod.LATE_FUSION.value:
+                border_color = "magenta"
+                tfidf_results = mmrs.tfidf(
+                    dataset_loader.tfidf,
+                    artist,
+                    song_title,
+                )
+                bert_results = mmrs.bert(
+                    dataset_loader.bert,
+                    artist,
+                    song_title,
+                )
+                if tfidf_results is not None and bert_results is not None:
+                    ir_results = mmrs.late_fusion(
+                        tfidf_results,
+                        bert_results,
+                    )
+                else:
+                    ir_results = mmrs.FALLBACK_RESULTS
             case _:  # default case not implemented
                 raise NotImplementedError("Default method not implemented yet")
 
@@ -116,6 +149,11 @@ def home():
 
 def main():
     app.run(debug=False, host="0.0.0.0", port=10000)
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
-""""""
-
+from transformers import BertTokenizer, BertModel
+import torch
 import logging
 import os
 from typing import Any, Callable, Dict, List, Literal
@@ -62,7 +62,9 @@ class DatasetLoader:
 
         # load all necessary files
         self.id_artist_song_album: pd.DataFrame = self._load("id_information_mmsr.tsv")
+        print(self.id_artist_song_album.head())  # Add this line to debug
         self.id_url: pd.DataFrame = self._load("id_url_mmsr.tsv")
+        print(self.id_url.head())  # Add this line to debug
         self.id_genres: pd.DataFrame = self._load("id_genres_mmsr.tsv", {"genre": eval})
         self.id_tags: pd.DataFrame = self._load(
             "id_tags_dict.tsv", {"(tag, weight)": eval}
@@ -114,6 +116,11 @@ class DatasetLoader:
             zip_ref.extractall(self.path)
         self.path = os.path.join(self.path, "dataset")
         self.logger.info(f"Extracted dataset to {self.path}")
+
+        # Load the BERT embeddings directly
+        self.bert_embeddings: np.ndarray[Any, np.dtype[np.float64]] = (
+            self._convert_to_numpy(self._load("id_lyrics_bert_mmsr.tsv"))
+        )
 
     def _load(
         self, filename: FILENAMES, converters: Dict[str, Callable[[Any], Any]] = {}

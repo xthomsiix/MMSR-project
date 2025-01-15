@@ -664,7 +664,130 @@ class MultiMediaRetrievalSystem:
         ndcg: float = dcg / idcg
         self.logger.debug(f"NDCG@{k}: {ndcg}")
         return np.round(ndcg, tol)
+    def bert_embeddings(
+        self,
+        bert_embeddings: np.ndarray[Any, np.dtype[np.float64]],
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
+        """
+        Performs a cosine-similarity-based search on BERT embeddings.
+        """
+        self.logger.debug(
+            f"Generating BERT-based search results for {artist} - {song_title}"
+        )
 
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        # retrieve query item BERT embedding
+        query_item_bert: np.ndarray[Any, np.dtype[np.float64]] = bert_embeddings[
+            self.data.index[self.data["id"] == query_item["id"].values[0]]  # type: ignore
+        ]
+
+        cosine_similarities: np.ndarray[Any, np.dtype[np.float64]] = np.dot(
+            bert_embeddings, query_item_bert.T
+        ).flatten()
+
+        # Get the top N items
+        modified_N = N + 1  # exclude the query item itself
+        top_N_indices: np.ndarray[Any, np.dtype[np.int64]] = np.argsort(
+            cosine_similarities
+        )[-modified_N:-1][::-1]
+
+        # Retrieve those items from self.data
+        query_result: pd.DataFrame = self.data.iloc[top_N_indices]
+
+        # Compute metrics
+        precision: float = self._compute_precision_at_k(query_result, query_item, N)
+        recall: float = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg: float = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr: float = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = self.get_formatted_search_results(query_result)
+        return {
+            "search_results": search_results,  # type: ignore
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
+    def early_fusion(
+        self,
+        tfidf: np.ndarray[Any, np.dtype[np.float64]],
+        bert: np.ndarray[Any, np.dtype[np.float64]],
+        artist: str | None,
+        song_title: str | None,
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
+        self.logger.debug(f"Generating early fusion search results for {artist} - {song_title}")
+
+        query_item = self.retrieve_query_item(self.data, artist, song_title)
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        # Combine features
+        query_item_tfidf = tfidf[self.data.index[self.data["id"] == query_item["id"].values[0]]]
+        query_item_bert = bert[self.data.index[self.data["id"] == query_item["id"].values[0]]]
+        combined_query_item = np.concatenate((query_item_tfidf, query_item_bert), axis=1)
+
+        combined_features = np.concatenate((tfidf, bert), axis=1)
+        cosine_similarities = np.dot(combined_features, combined_query_item.T).flatten()
+
+        modified_N = N + 1
+        top_N_indices = np.argsort(cosine_similarities)[-modified_N:-1][::-1]
+        query_result = self.data.iloc[top_N_indices]
+
+        precision = self._compute_precision_at_k(query_result, query_item, N)
+        recall = self._compute_recall_at_k(query_result, query_item, N)
+        ndcg = self._compute_ndcg_at_k(query_result, query_item, N)
+        mmr = self._compute_mrr_at_k(query_result, query_item, N)
+
+        search_results = self.get_formatted_search_results(query_result)
+        return {
+            "search_results": search_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
+    def late_fusion(
+        self,
+        tfidf_results: Dict[str, Any],
+        bert_results: Dict[str, Any],
+        N: int = 10,
+    ) -> Dict[str, str | float | List[Dict[Hashable, Any]] | None]:
+        self.logger.debug("Generating late fusion search results")
+
+        # Combine results and calculate scores
+        combined_results = []
+        for result in tfidf_results["search_results"]:
+            result["score"] = result.get("similarity", 0)
+            combined_results.append(result)
+        for result in bert_results["search_results"]:
+            result["score"] = result.get("similarity", 0)
+            combined_results.append(result)
+
+        # Sort combined results by score
+        combined_results = sorted(combined_results, key=lambda x: x["score"], reverse=True)[:N]
+
+        precision = (tfidf_results["precision"] + bert_results["precision"]) / 2
+        recall = (tfidf_results["recall"] + bert_results["recall"]) / 2
+        ndcg = (tfidf_results["ndcg"] + bert_results["ndcg"]) / 2
+        mmr = (tfidf_results["mrr"] + bert_results["mrr"]) / 2
+
+        return {
+            "search_results": combined_results,
+            "precision": precision,
+            "recall": recall,
+            "ndcg": ndcg,
+            "mrr": mmr,
+            "message": None,
+        }
     def _compute_mrr_at_k(
         self,
         query_result: pd.DataFrame,

@@ -10,4 +10,6 @@ class IRMethod(Enum):
     MUSIC_NN = "MusicNN"
     RESNET = "ResNet"
     VGG19 = "VGG19"
-    LLM = "LLM"
+    BERT_EMBEDDINGS = "BERT-Embeddings"
+    EARLY_FUSION = "Early-Fusion"  
+    LATE_FUSION = "Late-Fusion"        LLM = "LLM"
