@@ -156,10 +156,10 @@
             <button type="button" id="clearButton" onclick="clearForm()">Clear</button>
         </form>
     </div>
-    
+
     <div class="search-results">
         <h3 id="seachResultsHeading">
-            Search Results: 
+            Search Results:
             {% if artist and songTitle %}
                 {{ artist }} - {{ songTitle }}
             {% endif %}
@@ -187,7 +187,7 @@
             <thead>
                 <tr>
                     <th onclick="sortTable(0, true)">Rank</th>
-                    <th onclick="sortTable(1, false)">Author</th>
+                    <th onclick="sortTable(1, false)">Artist</th>
                     <th onclick="sortTable(2, false)">Title</th>
                     <th>Link</th>
                 </tr>
@@ -261,7 +261,7 @@
                         break;
                 }
             }
-            
+
             function sortTable(columnIndex, isNumeric) {
                 const table = document.getElementById("resultsTable");
                 const rows = Array.from(table.rows).slice(1); // Exclude header row
