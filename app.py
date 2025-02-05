@@ -33,6 +33,8 @@ class BorderColor(Enum):
     MAROON = "maroon"
     BROWN = "brown"
     YELLOW = "yellow"
+    CYAN = "cyan"
+    MAGENTA = "magenta"
 
 
 # initialize logger
@@ -58,63 +60,49 @@ def home():
             case IRMethod.BASELINE.value:
                 border_color = BorderColor.RED.value
                 ir_results = mmrs.baseline(artist, song_title, N)
+
             case IRMethod.TFIDF.value:
                 border_color = BorderColor.GREEN.value
                 ir_results = mmrs.tfidf(dataset_loader.tfidf, artist, song_title, N)
+
             case IRMethod.BERT.value:
                 border_color = BorderColor.BLUE.value
                 ir_results = mmrs.bert(dataset_loader.bert, artist, song_title, N)
+
             case IRMethod.BLF_SPECTRAL.value:
                 border_color = BorderColor.ORANGE.value
-                ir_results = mmrs.blf_spectral(
-                    dataset_loader.blf_spectral, artist, song_title, N
-                )
+                ir_results = mmrs.blf_spectral(dataset_loader.blf_spectral, artist, song_title, N)
+
             case IRMethod.MUSIC_NN.value:
                 border_color = BorderColor.PURPLE.value
-                ir_results = mmrs.music_nn(
-                    dataset_loader.music_nn, artist, song_title, N
-                )
+                ir_results = mmrs.music_nn(dataset_loader.music_nn, artist, song_title, N)
+
             case IRMethod.RESNET.value:
                 border_color = BorderColor.MAROON.value
                 ir_results = mmrs.resnet(dataset_loader.resnet, artist, song_title, N)
+
             case IRMethod.VGG19.value:
                 border_color = BorderColor.BROWN.value
                 ir_results = mmrs.vgg19(dataset_loader.vgg19, artist, song_title, N)
+
             case IRMethod.LLM.value:
                 border_color = BorderColor.YELLOW.value
                 ir_results = mmrs.llm(dataset_loader.llm, artist, song_title, N)
+
             case IRMethod.BERT_EMBEDDINGS.value:
                 border_color = BorderColor.BLUE.value
-                ir_results = mmrs.bert_embeddings(
-                    dataset_loader.bert,
-                    artist,
-                    song_title,
-                )
+                ir_results = mmrs.bert_embeddings(dataset_loader.bert, artist, song_title, N)
+
             case IRMethod.EARLY_FUSION.value:
-                border_color = "cyan"
-                ir_results = mmrs.early_fusion(
-                    dataset_loader.tfidf,
-                    dataset_loader.bert,
-                    artist,
-                    song_title,
-                )
+                border_color = BorderColor.CYAN.value
+                ir_results = mmrs.early_fusion(dataset_loader.tfidf, dataset_loader.bert, artist, song_title, N)
+
             case IRMethod.LATE_FUSION.value:
-                border_color = "magenta"
-                tfidf_results = mmrs.tfidf(
-                    dataset_loader.tfidf,
-                    artist,
-                    song_title,
-                )
-                bert_results = mmrs.bert(
-                    dataset_loader.bert,
-                    artist,
-                    song_title,
-                )
+                border_color = BorderColor.MAGENTA.value
+                tfidf_results = mmrs.tfidf(dataset_loader.tfidf, artist, song_title, N)
+                bert_results = mmrs.bert(dataset_loader.bert, artist, song_title, N)
                 if tfidf_results is not None and bert_results is not None:
-                    ir_results = mmrs.late_fusion(
-                        tfidf_results,
-                        bert_results,
-                    )
+                    ir_results = mmrs.late_fusion(tfidf_results, bert_results, N)
                 else:
                     ir_results = mmrs.FALLBACK_RESULTS
             case _:  # default case not implemented
