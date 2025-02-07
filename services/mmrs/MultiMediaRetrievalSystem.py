@@ -502,7 +502,7 @@ class MultiMediaRetrievalSystem:
         dataset = df_clean.set_index(
             "id"
         ).T.to_dict()  # convert to dictionary to be passed in the prompt
-        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N+2}"""
+        input_query = f"""Song to make suggestions about: {artist}-{song_title}. Number of suggestions you should make: {N+2}"""  # noqa: E501
         prompt = f"""<purpose>You are a music expert that suggests similar songs based on a given artist and song title. You will be given a music dataset with artists and songs from which you have to make your picks.</purpose>
                      <instructions>You will be provided what number of similar songs you should suggest in the input by the user.</instructions>
                      <instructions>Pick said number of songs that you think are most similar from the dataset.</instructions>
@@ -539,7 +539,7 @@ class MultiMediaRetrievalSystem:
         ]  # get all existing song suggestions
         if (
             input_song_id in query_result["id"].values and len(query_result) > N
-        ):  # check if the model returned more than N existing IDs and remove the input song from the results if present
+        ):  # check if the model returned more than N existing IDs and remove the input song from the results if present  # noqa: E501
             query_result = query_result[query_result["id"] != input_song_id]
 
         # Take the top N suggestions (after removal if applicable)
@@ -838,9 +838,105 @@ class MultiMediaRetrievalSystem:
         # if no relevant item is found, return zero
         return 0.0
 
-    def find_most_dissimilar(
+    # --------------------------------------------------------
+    # NEW: Evaluation of the NDCG-Diversity Tradeoff Metric
+    # --------------------------------------------------------
+    def evaluate_tradeoff(
         self,
-        query: pd.DataFrame,
-        query_results: pd.DataFrame,
-    ):
-        pass
+        ranking_func,  # one of your ranking functions (e.g., self.tfidf)
+        *args,
+        N: int = 10,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Evaluate a ranking function by computing both the NDCG and the diversity,
+        and combine them into a single tradeoff score.
+
+        The combined score is:
+            tradeoff = lambda_tradeoff * ndcg + (1 - lambda_tradeoff) * diversity
+        (You can adjust this formula as desired.)
+
+        The ranking function (e.g., self.tfidf, self.bert, etc.) is expected to return
+        a dictionary that includes the key "ndcg" and "search_results". The search_results
+        are then used to compute diversity.
+        """
+        # Get the ranking results using the provided ranking function.
+        results = ranking_func(*args, **kwargs, N=N)
+        query_item = self.retrieve_query_item(
+            self.data, kwargs.get("artist"), kwargs.get("song_title")
+        )
+        if query_item is None:
+            return self.FALLBACK_RESULTS
+
+        # Convert the list of search result dicts to a DataFrame so we can compute diversity.
+        results_df = pd.DataFrame(results["search_results"])
+        diversity = self._compute_diversity_at_k(results_df, N)
+        coverage = self._compute_coverage_at_k(results_df, N)
+
+        # Log and return all relevant metrics.
+        results["diversity"] = diversity
+        results["coverage"] = coverage
+        return results
+
+    # -----------------------------
+    # NEW: Diversity Metric Method
+    # -----------------------------
+    def _compute_diversity_at_k(
+        self,
+        query_result: pd.DataFrame,
+        k: int,
+        tol: int = DISPLAY_TOL,
+    ) -> float:
+        """
+        Compute intra-list diversity as the average pairwise Jaccard dissimilarity
+        between the genre sets of the top k retrieved items.
+        """
+        # Get the top k genres as sets (each item can have multiple genres)
+        top_k_genres: List[Set[str]] = (
+            query_result.head(k)["genre"].apply(lambda x: set(x)).tolist()
+        )
+        if len(top_k_genres) < 2:
+            return 0.0  # No diversity to compute with one item
+        dissimilarities = []
+        # Compute pairwise Jaccard dissimilarity (1 - similarity)
+        for i in range(len(top_k_genres)):
+            for j in range(i + 1, len(top_k_genres)):
+                union = top_k_genres[i] | top_k_genres[j]
+                # Avoid division by zero (if both sets are empty, assume they’re identical)
+                if not union:
+                    similarity = 1.0
+                else:
+                    similarity = len(top_k_genres[i] & top_k_genres[j]) / len(union)
+                dissimilarities.append(1 - similarity)
+        diversity = np.mean(dissimilarities)
+        self.logger.debug(f"Diversity@{k}: {diversity}")
+        return np.round(diversity, tol)  # type: ignore
+
+    def _compute_coverage_at_k(
+        self,
+        query_result: pd.DataFrame,
+        k: int,
+        tol: int = DISPLAY_TOL,
+    ) -> float:
+        """
+        Compute coverage as the fraction of unique genres in the top k retrieved items
+        relative to the total unique genres in the dataset.
+        """
+        # Get the top k genres as sets (each item can have multiple genres)
+        top_k_genres: List[Set[str]] = (
+            query_result.head(k)["genre"].apply(lambda x: set(x)).tolist()
+        )
+        # Compute the union of genres in the top k results
+        union_top_k: Set[str] = set()
+        for genres in top_k_genres:
+            union_top_k |= genres
+
+        # Compute total unique genres in the dataset
+        all_genres: Set[str] = set()
+        self.data["genre"].apply(lambda x: all_genres.update(set(x)))
+        if not all_genres:
+            return 0.0  # Avoid division by zero
+
+        coverage = len(union_top_k) / len(all_genres)
+        self.logger.debug(f"Coverage@{k}: {coverage}")
+        return np.round(coverage, tol)

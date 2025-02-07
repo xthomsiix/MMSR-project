@@ -313,14 +313,3 @@ class MetricCalculator:
             np.mean(ndcg_at_k_list).round(tol),
             np.mean(mrr_at_k_list).round(tol),
         )
-
-    def compute_optimized_div_at_n(
-        self,
-        ir_method: IRMethod,
-        sample_size: int,
-        N: int,
-        tol: int = DISPLAY_TOL,
-    ):
-        cumulative_ndcg = 0.0
-        artists, songs = self.get_sample(sample_size)
-        pass
